@@ -70,15 +70,57 @@ Response: `{"room_id": "!<id>:<DOMAIN>"}`
 
 ### Send a Message in a Room
 
+**Simple message (no mention):**
 ```bash
 curl -X PUT "http://127.0.0.1:6167/_matrix/client/v3/rooms/<ROOM_ID>/send/m.room.message/$(date +%s)" \
   -H "Authorization: Bearer ${MANAGER_TOKEN}" \
   -H 'Content-Type: application/json' \
   -d '{
     "msgtype": "m.text",
-    "body": "Hello, this is your task assignment..."
+    "body": "Hello, this is a general announcement..."
   }'
 ```
+
+### Send a Message with @Mention (Critical for Workers)
+
+**IMPORTANT**: When sending messages to Workers in group rooms, you MUST include the `m.mentions` field for them to receive the message. Workers have `requireMention: true` enabled, meaning they only process messages that properly @mention them.
+
+```bash
+# Mention a single user
+curl -X PUT "http://127.0.0.1:6167/_matrix/client/v3/rooms/<ROOM_ID>/send/m.room.message/$(date +%s)" \
+  -H "Authorization: Bearer ${MANAGER_TOKEN}" \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "msgtype": "m.text",
+    "body": "@<WORKER_NAME>:'"${HICLAW_MATRIX_DOMAIN}"' Your task assignment: ...",
+    "m.mentions": {
+      "user_ids": ["@<WORKER_NAME>:'"${HICLAW_MATRIX_DOMAIN}"'"]
+    }
+  }'
+```
+
+```bash
+# Mention multiple users
+curl -X PUT "http://127.0.0.1:6167/_matrix/client/v3/rooms/<ROOM_ID>/send/m.room.message/$(date +%s)" \
+  -H "Authorization: Bearer ${MANAGER_TOKEN}" \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "msgtype": "m.text",
+    "body": "@alice:'"${HICLAW_MATRIX_DOMAIN}"' and @bob:'"${HICLAW_MATRIX_DOMAIN}"' please coordinate on this task...",
+    "m.mentions": {
+      "user_ids": [
+        "@alice:'"${HICLAW_MATRIX_DOMAIN}"'",
+        "@bob:'"${HICLAW_MATRIX_DOMAIN}"'"
+      ]
+    }
+  }'
+```
+
+**Rules for @mentions:**
+- The `user_ids` array in `m.mentions` MUST contain the full Matrix user ID (e.g., `@alice:matrix-local.hiclaw.io:8080`)
+- The user ID in the body text and in `m.mentions.user_ids` must match exactly
+- Without `m.mentions`, Workers will receive the message but will NOT process it (it will be ignored)
+- This follows Matrix MSC3952 (Intentional Mentions) specification
 
 ### List Joined Rooms
 

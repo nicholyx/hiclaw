@@ -204,21 +204,46 @@ push-native-worker: build-worker ## Push native-arch Worker only (dev)
 
 # ---------- Test ----------
 
-test: ## Run integration tests (builds images first unless SKIP_BUILD=1)
-ifdef SKIP_BUILD
-	@echo "==> Running tests (skip build)"
-	./tests/run-all-tests.sh --skip-build $(if $(TEST_FILTER),--test-filter "$(TEST_FILTER)")
+# Wait for Manager services to be ready (used internally by test target)
+.PHONY: wait-ready
+wait-ready:
+	@echo "==> Waiting for Manager services to be ready..."
+	@TIMEOUT=300; ELAPSED=0; \
+	while [ "$$ELAPSED" -lt "$$TIMEOUT" ]; do \
+		MATRIX=$$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:6167/_matrix/client/versions" 2>/dev/null || echo "000"); \
+		MINIO=$$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:9000/minio/health/live" 2>/dev/null || echo "000"); \
+		CONSOLE=$$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:8001/" 2>/dev/null || echo "000"); \
+		if [ "$$MATRIX" = "200" ] && [ "$$MINIO" = "200" ] && [ "$$CONSOLE" = "200" ]; then \
+			echo "==> Services ready (took $${ELAPSED}s)"; \
+			echo "==> Waiting additional 120s for Manager Agent initialization..."; \
+			sleep 120; \
+			echo "==> Manager Agent should be ready now"; \
+			exit 0; \
+		fi; \
+		sleep 5; \
+		ELAPSED=$$((ELAPSED + 5)); \
+		echo "    Still waiting... ($${ELAPSED}s) Matrix=$$MATRIX MinIO=$$MINIO Console=$$CONSOLE"; \
+	done; \
+	echo "ERROR: Manager did not become ready within $${TIMEOUT}s"; \
+	exit 1
+
+test: ## Run integration tests (installs Manager first unless SKIP_INSTALL=1)
+ifdef SKIP_INSTALL
+	@echo "==> Running tests against existing installation"
+	./tests/run-all-tests.sh --skip-build --use-existing $(if $(TEST_FILTER),--test-filter "$(TEST_FILTER)") $(if $(INCLUDE_PROJECT_TEST),--include-project-test)
 else
-	@echo "==> Building images and running tests"
-	$(MAKE) build
-	./tests/run-all-tests.sh --skip-build $(if $(TEST_FILTER),--test-filter "$(TEST_FILTER)")
+	@echo "==> Installing Manager and running tests"
+	$(MAKE) uninstall 2>/dev/null || true
+	$(MAKE) install
+	$(MAKE) wait-ready
+	./tests/run-all-tests.sh --skip-build --use-existing $(if $(TEST_FILTER),--test-filter "$(TEST_FILTER)") $(if $(INCLUDE_PROJECT_TEST),--include-project-test)
 endif
 
 test-quick: ## Run test-01 only (quick smoke test)
 	$(MAKE) test TEST_FILTER="01"
 
 test-installed: ## Run tests against an already-installed Manager (no container lifecycle)
-	./tests/run-all-tests.sh --skip-build --use-existing $(if $(TEST_FILTER),--test-filter "$(TEST_FILTER)")
+	./tests/run-all-tests.sh --skip-build --use-existing $(if $(TEST_FILTER),--test-filter "$(TEST_FILTER)") $(if $(INCLUDE_PROJECT_TEST),--include-project-test)
 
 # ---------- Install / Uninstall ----------
 
@@ -296,8 +321,10 @@ help: ## Show this help
 	@echo "  REGISTRY             Container registry    (default: ghcr.io)"
 	@echo "  REPO                 Repository path       (default: higress-group/hiclaw)"
 	@echo "  HIGRESS_REGISTRY     Base image registry   (default: cn-hangzhou, see below)"
-	@echo "  SKIP_BUILD           Skip build in 'test'  (set to 1 to skip)"
+	@echo "  SKIP_BUILD           Skip build in 'install' (set to 1 to skip)"
+	@echo "  SKIP_INSTALL         Skip install in 'test' (set to 1 to test existing)"
 	@echo "  TEST_FILTER          Test numbers to run   (e.g., '01 02 03')"
+	@echo "  INCLUDE_PROJECT_TEST Include project-collaboration test (set to 1)"
 	@echo "  DOCKER_PLATFORM      Build platform        (e.g., linux/amd64)"
 	@echo "  MULTIARCH_PLATFORMS  Multi-arch platforms   (default: linux/amd64,linux/arm64)"
 	@echo "  BUILDX_BUILDER       Buildx builder name   (default: hiclaw-multiarch)"
@@ -316,7 +343,12 @@ help: ## Show this help
 	@echo "  HICLAW_LLM_API_KEY=sk-xxx make install          # Build + install Manager (non-interactive)"
 	@echo "  HICLAW_LLM_API_KEY=sk-xxx HICLAW_DATA_DIR=~/hiclaw-data make install  # With external data dir"
 	@echo "  make uninstall                                  # Stop + remove Manager and Workers"
-	@echo "  make test-installed                             # Run tests against installed Manager"
+	@echo ""
+	@echo "Test:"
+	@echo "  HICLAW_LLM_API_KEY=sk-xxx make test             # Install + run all tests"
+	@echo "  make test SKIP_INSTALL=1                        # Run tests against existing Manager"
+	@echo "  make test TEST_FILTER=\"01 02\"                   # Run specific tests only"
+	@echo "  make test INCLUDE_PROJECT_TEST=1                # Include project-collaboration test"
 	@echo "  make replay TASK=\"Create worker alice\"          # Send a task to Manager"
 	@echo "  make replay                                     # Interactive task input"
 	@echo ""
