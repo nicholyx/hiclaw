@@ -5,6 +5,9 @@ hiclaw-manager.env
 # Replay logs (contain conversation data, may include secrets)
 logs/
 
+# IDE / Kiro workspace files
+.kiro/
+
 # OS files
 .DS_Store
 
