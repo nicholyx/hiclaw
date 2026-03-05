@@ -24,6 +24,11 @@ You → Manager → Worker Alice (frontend)
 
 All communication happens in Matrix Rooms. You see everything, and can intervene anytime — just like messaging a team in a group chat.
 
+## News
+
+- **2026-03-04**: We officially open source HiClaw，an Agent Teams System. Read more on our [blog](https://github.com/higress-group/hiclaw/blob/main/blog/hiclaw-announcement.md).
+
+
 ## Why HiClaw
 
 **Security by design**: Workers never hold real API keys or GitHub PATs. They only carry a consumer token (like a badge). Even a compromised Worker can't leak your credentials.
@@ -229,7 +234,7 @@ make help  # All available targets
 - WeChat Group — scan to join:
 
 <p align="center">
-  <img src="https://img.alicdn.com/imgextra/i1/O1CN01TL78xI1V83fYAkbZK_!!6000000002607-2-tps-772-752.png" width="200" alt="WeChat Group" />
+  <img src="https://img.alicdn.com/imgextra/i2/O1CN01iCufka1CYBZ1RiRv4_!!6000000000092-2-tps-762-724.png" width="200" alt="WeChat Group" />
 </p>
 
 ## License
