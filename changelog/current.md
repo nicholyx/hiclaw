@@ -4,4 +4,3 @@ Record image-affecting changes to `manager/`, `worker/`, `openclaw-base/` here b
 
 ---
 
-- fix(manager): propagate Manager TZ env to Worker containers — container-api.sh (local socket mode), create-worker.sh (remote install command), and install_worker in hiclaw-install.sh all now pass `TZ` so Worker timezone matches Manager
