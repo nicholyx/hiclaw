@@ -60,9 +60,13 @@ bash <(curl -sSL https://higress.ai/hiclaw/install.sh)
 
 When the installer detects an existing installation, it will ask how to proceed. Choosing delete will wipe the stale data and start fresh.
 
-**Case 3: Mac with M4 chip**
+**Case 3: Mac with Apple Silicon and outdated Docker**
 
-If you're using a Mac with Apple M4 chip, there is a known compatibility issue where Manager Agent may fail to start properly. We are actively working on support for M4 chips — please stay tuned for updates in future releases.
+If you're using a Mac with Apple Silicon (M1/M2/M3/M4) and Docker Desktop is older than 4.39.0, Manager Agent may fail to start properly.
+
+**Solution:** Upgrade Docker Desktop to 4.39.0 or later.
+
+Note: Podman does not have this issue.
 
 ---
 
