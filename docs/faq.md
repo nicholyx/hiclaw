@@ -60,6 +60,10 @@ bash <(curl -sSL https://higress.ai/hiclaw/install.sh)
 
 When the installer detects an existing installation, it will ask how to proceed. Choosing delete will wipe the stale data and start fresh.
 
+**Case 3: Mac with M4 chip**
+
+If you're using a Mac with Apple M4 chip, there is a known compatibility issue where Manager Agent may fail to start properly. We are actively working on support for M4 chips — please stay tuned for updates in future releases.
+
 ---
 
 ## Accessing the web UI from other devices on the LAN
