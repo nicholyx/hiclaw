@@ -262,7 +262,7 @@ make help  # 查看所有可用目标
 ## 社区
 
 - [Discord](https://discord.gg/NVjNA4BAVw)
-- [钉钉群](https://qr.dingtalk.com/action/joingroup?code=v1,k1,0etR5l8fxeb/6/mzE5hRE1uy4tkiwxvPV9+TdBv7sEM=&_dt_no_comment=1&origin=11)
+- [钉钉群](https://qr.dingtalk.com/action/joingroup?code=v1,k1,6UzvW/6kvHcW2aBsoyJE0roFxM7xt0VgBuU8T3S8aYM=&_dt_no_comment=1&origin=11)
 - 微信群——扫码加入：
 
 <p align="center">
