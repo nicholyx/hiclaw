@@ -2,9 +2,10 @@
 
 ### 1. Read state.json
 
-Read state.json (local only, no sync needed):
+Read state.json (local only, no sync needed). If the file does not exist, initialize it first:
 
 ```bash
+bash /opt/hiclaw/agent/skills/task-management/scripts/manage-state.sh --action init
 cat ~/state.json
 ```
 
@@ -23,7 +24,10 @@ Iterate over entries in `active_tasks` with `"type": "finite"`:
   ```
 - Determine if the Worker is making normal progress based on their reply
 - If the Worker has not responded (no response for more than one heartbeat cycle), flag the anomaly in the Room and notify the human admin
-- If the Worker has replied that the task is complete but meta.json has not been updated, proactively update meta.json (status → completed, fill in completed_at), and remove the entry from `active_tasks` in state.json
+- If the Worker has replied that the task is complete but meta.json has not been updated, proactively update meta.json (status → completed, fill in completed_at), and remove the entry from `active_tasks`:
+  ```bash
+  bash /opt/hiclaw/agent/skills/task-management/scripts/manage-state.sh --action complete --task-id {task-id}
+  ```
 
 ---
 
@@ -43,7 +47,11 @@ If conditions are met, @mention the Worker in the corresponding room_id to trigg
   @{worker}:{domain} It's time to run your scheduled task {task-id} "{task-title}". Please execute it now and report back with the keyword "executed".
 ```
 
-**Note**: Infinite tasks are never removed from active_tasks. After the Worker reports `executed`, the Manager updates `last_executed_at` and `next_scheduled_at` in `~/state.json`.
+**Note**: Infinite tasks are never removed from active_tasks. After the Worker reports `executed`, update `last_executed_at` and `next_scheduled_at`:
+```bash
+bash /opt/hiclaw/agent/skills/task-management/scripts/manage-state.sh \
+  --action executed --task-id {task-id} --next-scheduled-at "{new-ISO-8601}"
+```
 
 ---
 

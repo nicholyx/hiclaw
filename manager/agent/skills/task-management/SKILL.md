@@ -9,7 +9,7 @@ description: Assign and track tasks for Worker Agents. Use when the human admin 
 
 **Trigger**: Admin gives a task without naming a Worker.
 
-1. Check existing Workers and workload: `cat ~/workers-registry.json && cat ~/state.json`
+1. Check existing Workers and workload: `cat ~/workers-registry.json && bash /opt/hiclaw/agent/skills/task-management/scripts/manage-state.sh --action list`
 2. Present options to admin:
    - **Option A** — Assign to an idle existing Worker (list name + role + status)
    - **Option B** — Create a new Worker (suggest name/role/skills/model based on task type; ask about find-skills, see Step 4)
@@ -58,8 +58,19 @@ Ask admin: enable find-skills (recommended) or disable; optionally provide custo
    @{worker}:{domain} New task [{task-id}]: {title}. Use your file-sync skill to pull the spec: hiclaw/hiclaw-storage/shared/tasks/{task-id}/spec.md. @mention me when complete.
    ```
    - If Worker has `find-skills` skill (`test -d /root/hiclaw-fs/agents/{worker}/skills/find-skills`), add: `💡 Run \`skills find <keyword>\` if you need additional capabilities.`
-4. Add to `state.json` `active_tasks`
-5. On completion: update `meta.json` status=completed + completed_at, remove from `state.json`, log to `memory/YYYY-MM-DD.md`
+4. Add to `state.json`:
+   ```bash
+   bash /opt/hiclaw/agent/skills/task-management/scripts/manage-state.sh \
+     --action add-finite --task-id {task-id} --title "{short description}" \
+     --assigned-to {worker} --room-id {room-id}
+   ```
+   If the task belongs to a project, append `--project-room-id {project-room-id}`.
+5. On completion: update `meta.json` status=completed + completed_at, then remove from `state.json`:
+   ```bash
+   bash /opt/hiclaw/agent/skills/task-management/scripts/manage-state.sh \
+     --action complete --task-id {task-id}
+   ```
+   Log to `memory/YYYY-MM-DD.md`.
 
 **Task directory layout:**
 ```
@@ -95,10 +106,20 @@ For recurring/scheduled tasks:
    ```
    - `status` is always `"active"`, never `"completed"`
    - `schedule`: standard 5-field cron; `timezone`: tz database name
-2. Add to `state.json` with scheduling fields
+2. Add to `state.json`:
+   ```bash
+   bash /opt/hiclaw/agent/skills/task-management/scripts/manage-state.sh \
+     --action add-infinite --task-id {task-id} --title "{short description}" \
+     --assigned-to {worker} --room-id {room-id} \
+     --schedule "{cron}" --timezone "{tz}" --next-scheduled-at "{ISO-8601}"
+   ```
 3. Heartbeat triggers when `now > next_scheduled_at + 30min` and `last_executed_at < next_scheduled_at`
 4. Trigger message: `@{worker}:{domain} Execute recurring task {task-id}: {title}. Report back with "executed" when done.`
-5. On execution: update `last_executed_at`, recalculate `next_scheduled_at` in `state.json`
+5. On execution: update `last_executed_at` and recalculate `next_scheduled_at`:
+   ```bash
+   bash /opt/hiclaw/agent/skills/task-management/scripts/manage-state.sh \
+     --action executed --task-id {task-id} --next-scheduled-at "{new-ISO-8601}"
+   ```
 
 ---
 
@@ -108,6 +129,12 @@ Path: `~/state.json`
 
 Single source of truth for active tasks. Heartbeat reads this instead of scanning all meta.json files.
 
+**Always use `manage-state.sh` to modify this file** — never edit it manually with jq or text editors. The script handles initialization, deduplication, and atomic writes.
+
+```bash
+STATE_SCRIPT=/opt/hiclaw/agent/skills/task-management/scripts/manage-state.sh
+```
+
 ### Structure
 
 ```json
@@ -115,12 +142,14 @@ Single source of truth for active tasks. Heartbeat reads this instead of scannin
   "active_tasks": [
     {
       "task_id": "task-20260219-120000",
+      "title": "Implement login page",
       "type": "finite",
       "assigned_to": "alice",
       "room_id": "!xxx:matrix-domain"
     },
     {
       "task_id": "task-20260219-130000",
+      "title": "Daily security scan",
       "type": "infinite",
       "assigned_to": "bob",
       "room_id": "!yyy:matrix-domain",
@@ -134,14 +163,15 @@ Single source of truth for active tasks. Heartbeat reads this instead of scannin
 }
 ```
 
-### Maintenance Rules
+### Script Reference
 
-| When | Action |
-|------|--------|
-| Assign a finite task | Add entry to `active_tasks` (type=finite) |
-| Create an infinite task | Add entry to `active_tasks` (type=infinite, with schedule/timezone/next_scheduled_at) |
-| Finite task completed | Remove the task_id from `active_tasks` |
-| Infinite task executed | Update `last_executed_at`, recalculate `next_scheduled_at` |
-| After every write | Update `updated_at` (no sync needed — local only) |
+| When | Command |
+|------|---------|
+| Ensure file exists | `bash $STATE_SCRIPT --action init` |
+| Assign a finite task | `bash $STATE_SCRIPT --action add-finite --task-id T --title TITLE --assigned-to W --room-id R` |
+| Create an infinite task | `bash $STATE_SCRIPT --action add-infinite --task-id T --title TITLE --assigned-to W --room-id R --schedule CRON --timezone TZ --next-scheduled-at ISO` |
+| Finite task completed | `bash $STATE_SCRIPT --action complete --task-id T` |
+| Infinite task executed | `bash $STATE_SCRIPT --action executed --task-id T --next-scheduled-at ISO` |
+| View active tasks | `bash $STATE_SCRIPT --action list` |
 
-If `~/state.json` does not exist yet, create it with `{"active_tasks": [], "updated_at": "<ISO-8601>"}`.
+The script auto-creates `~/state.json` if missing, skips duplicate additions, and updates `updated_at` on every write.

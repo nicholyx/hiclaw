@@ -70,7 +70,7 @@ Assign, track, and complete tasks for Workers.
 
 - Admin gives a task and no Worker is specified → Worker availability check (Step 0)
 - Assigning a finite or infinite task to a Worker → create task directory, write `meta.json` + `spec.md`, notify Worker
-- Worker @mentions you with completion → update `meta.json`, remove from `state.json`, log to memory
+- Worker @mentions you with completion → update `meta.json`, run `manage-state.sh --action complete`, log to memory
 
 ## task-coordination
 

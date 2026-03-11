@@ -70,6 +70,16 @@ EOF
 }
 EOF
     fi
+
+    if [ ! -f "$STATE_FILE" ]; then
+        _log "Initializing $STATE_FILE"
+        cat > "$STATE_FILE" << EOF
+{
+  "active_tasks": [],
+  "updated_at": "$(_ts)"
+}
+EOF
+    fi
 }
 
 # Ensure a worker entry exists in lifecycle file

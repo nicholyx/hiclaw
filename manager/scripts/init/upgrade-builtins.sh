@@ -83,6 +83,14 @@ if [ ! -f "${WORKSPACE}/workers-registry.json" ]; then
     fi
 fi
 
+# Sync state.json template if not yet present (never overwrite user data)
+if [ ! -f "${WORKSPACE}/state.json" ]; then
+    if [ -f "${AGENT_SRC}/state.json" ]; then
+        cp "${AGENT_SRC}/state.json" "${WORKSPACE}/state.json"
+        log "  Initialized state.json"
+    fi
+fi
+
 # ============================================================
 # Step 3: Publish Worker builtin templates to MinIO shared/builtins/worker/
 # ============================================================
