@@ -41,7 +41,7 @@ HiClaw 并不和其他 xxClaw 对标，HiClaw 是一个 Agent 协作系统。
 - **技能生态**：Worker 可以按需从 [skills.sh](https://skills.sh) 获取技能（社区已有 80,000+ 个）。因为 Worker 本身就拿不到真实凭证，所以可以放心使用公开技能库。
 
 ## 快速开始
-**前置条件**：Docker Desktop（Windows/macOS）或 Docker Engine（Linux）。仅此而已。
+**前置条件**：Docker Desktop（Windows/macOS）或 Docker Engine（Linux）。若在 ECS 或云桌面等虚拟机上部署，请采用 Linux 系统，图形化需求，请使用 Ubutun，官方镜像包暂不支持虚拟机上的 Window 系统，原因是虚拟机上的 Window 系统不是 Linux Container。
 
 - [Docker Desktop](https://www.docker.com/products/docker-desktop/)（Windows / macOS）
 - [Docker Engine](https://docs.docker.com/engine/install/)（Linux）或 [Podman Desktop](https://podman-desktop.io/)（替代方案）
@@ -287,11 +287,11 @@ make help  # 查看所有可用目标
 ## 社区
 
 - [Discord](https://discord.gg/NVjNA4BAVw)
-- [钉钉群](https://qr.dingtalk.com/action/joingroup?code=v1,k1,6UzvW/6kvHcW2aBsoyJE0roFxM7xt0VgBuU8T3S8aYM=&_dt_no_comment=1&origin=11)
+- [钉钉群](https://qr.dingtalk.com/action/joingroup?code=v1,k1,5K+D/m2s71QW2aBsoyJE0t2oQOMCk2yngAgkih4LyQM=&_dt_no_comment=1&origin=11)
 - 微信群——扫码加入：
 
 <p align="center">
-  <img src="https://img.alicdn.com/imgextra/i2/O1CN01ga2NAM1QOTnByKW4l_!!6000000001966-2-tps-772-742.png" width="200" alt="微信群" />
+  <img src="https://img.alicdn.com/imgextra/i1/O1CN01ZwP1gd27xlmxoqSa8_!!6000000007864-2-tps-752-740.png" width="200" alt="微信群" />
 </p>
 
 ## 许可证
