@@ -29,5 +29,8 @@ Record image-affecting changes to `manager/`, `worker/`, `openclaw-base/` here b
 - feat(manager): add mcporter SKILL.md to `worker-agent/skills/` (OpenClaw builtin) so upgrade-builtins pushes it to all OpenClaw workers; `copaw-worker-agent/skills/mcporter/` already present for CoPaw workers
 - feat(openclaw-base): update OpenClaw to `685223f` — support sending slash commands with @mention in group rooms (e.g. `@Worker /compact`)
 - fix(copaw): strip leading @mention prefix from message text in group rooms so slash commands (e.g. `@Worker /new`) are correctly detected
+- fix(worker): clean orphaned session write locks before starting OpenClaw to prevent "session file locked (timeout 10000ms)" after container restart or crash
+- fix(worker): exclude `*.lock` files from Local->Remote sync to prevent stale session locks from being pushed to MinIO
+- fix(copaw): exclude `.lock` files from `push_local` to prevent stale session locks from being pushed to MinIO
 
 

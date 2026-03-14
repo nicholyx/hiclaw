@@ -116,7 +116,7 @@ log "HOME set to ${HOME} (workspace files will be synced to MinIO)"
             if ! mc mirror "${WORKSPACE}/" "hiclaw/hiclaw-storage/agents/${WORKER_NAME}/" --overwrite \
                 --exclude "openclaw.json" --exclude "config/mcporter.json" --exclude "mcporter-servers.json" --exclude ".agents/**" \
                 --exclude ".cache/**" --exclude ".npm/**" \
-                --exclude ".local/**" --exclude ".mc/**" 2>&1; then
+                --exclude ".local/**" --exclude ".mc/**" --exclude "*.lock" 2>&1; then
                 log "WARNING: Local->Remote sync failed"
             fi
         fi
@@ -168,4 +168,10 @@ export MCPORTER_CONFIG="${MCPORTER_DEFAULT}"
 log "Starting Worker Agent: ${WORKER_NAME}"
 export OPENCLAW_CONFIG_PATH="${WORKSPACE}/openclaw.json"
 cd "${WORKSPACE}"
+
+# Clean orphaned session write locks (e.g. from SIGKILL or crash before exit handlers)
+# Prevents "session file locked (timeout 10000ms)" when PID was reused
+find "${HOME}/.openclaw/agents" -name "*.jsonl.lock" -delete 2>/dev/null || true
+log "Cleaned up any orphaned session write locks"
+
 exec openclaw gateway run --verbose --force
