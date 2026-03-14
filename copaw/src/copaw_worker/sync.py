@@ -1,8 +1,18 @@
 """MinIO file sync for copaw-worker.
 
 All MinIO operations use the `mc` CLI (MinIO Client).
-Pulls openclaw.json, SOUL.md, AGENTS.md, and skills from MinIO bucket.
-Runs a background loop that re-pulls on interval and calls on_pull callback.
+
+Ownership split (aligned with OpenClaw worker-entrypoint.sh):
+
+  Manager-managed (Worker read-only, pull only, never overwrite):
+    openclaw.json, mcporter-servers.json, skills/, shared/
+
+  Worker-managed (Worker read-write, push to MinIO, never pull-overwrite):
+    AGENTS.md, SOUL.md, .copaw/sessions/, memory/, etc.
+
+  Local -> Remote (push_loop): change-triggered push of Worker-managed content.
+  Remote -> Local (sync_loop pull_all): allowlist only, Manager-managed paths.
+  Prevents .copaw/sessions conflict: sessions backed up but never pulled back.
 """
 from __future__ import annotations
 
@@ -155,12 +165,15 @@ class FileSync:
         return self._cat(f"{self._prefix}/skills/{skill_name}/SKILL.md")
 
     def pull_all(self) -> list[str]:
-        """Pull all known files; return list of filenames that changed."""
+        """Pull Manager-managed files only (allowlist). Returns list of filenames that changed.
+
+        Does NOT pull AGENTS.md, SOUL.md (Worker-managed, sync up but never overwrite).
+        """
         changed: list[str] = []
+        # Manager-managed files (allowlist)
         files = {
             "openclaw.json": f"{self._prefix}/openclaw.json",
-            "SOUL.md": f"{self._prefix}/SOUL.md",
-            "AGENTS.md": f"{self._prefix}/AGENTS.md",
+            "mcporter-servers.json": f"{self._prefix}/mcporter-servers.json",
         }
         for name, key in files.items():
             content = self._cat(key)
@@ -169,10 +182,11 @@ class FileSync:
             local = self.local_dir / name
             existing = local.read_text() if local.exists() else None
             if content != existing:
+                local.parent.mkdir(parents=True, exist_ok=True)
                 local.write_text(content)
                 changed.append(name)
 
-        # Also check for skill changes
+        # Manager-managed: skills/
         for skill_name in self.list_skills():
             skill_md = self.get_skill_md(skill_name)
             if skill_md is None:
@@ -215,20 +229,17 @@ def push_local(sync: FileSync, since: float = 0) -> list[str]:
     mtime > `since` (epoch seconds), then content-compares before uploading.
     When since=0 (first run), scans all eligible files.
 
-    Excludes Manager-owned config files and internal dirs, matching the
-    exclude list in worker-entrypoint.sh's Local->Remote sync.
+    Excludes Manager-managed files only. AGENTS.md, SOUL.md, .copaw/sessions/
+    are Worker-managed and are pushed (including session backup).
     """
-    # Manager-owned files that should never be pushed back (workspace root)
+    # Manager-managed files that should never be pushed back (workspace root)
     _EXCLUDE_FILES = {
         "openclaw.json",
-        "AGENTS.md",
-        "SOUL.md",
         "mcporter-servers.json",
     }
     # Directory name components to skip anywhere in the tree
     _EXCLUDE_DIRS = {
         ".agents",
-        ".openclaw",
         ".cache",
         ".npm",
         ".local",

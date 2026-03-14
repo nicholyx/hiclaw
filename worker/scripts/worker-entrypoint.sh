@@ -92,21 +92,36 @@ log "HOME set to ${HOME} (workspace files will be synced to MinIO)"
 # ============================================================
 # Step 3: Start file sync
 # ============================================================
-
-# Local -> Remote: change-triggered sync (avoids mc mirror --watch TOCTOU crash bug)
-# Note: mc mirror --watch has a bug where it crashes when source files are deleted
-# during atomic operations (e.g., npm install, skills add). This approach:
-# - Uses find to detect recent file changes (lightweight, local filesystem only)
-# - Only runs mc mirror when changes are detected (avoids unnecessary network IO)
-# - mc mirror itself only transfers changed files (incremental)
+#
+# Bidirectional sync between Worker workspace and MinIO, with clear ownership split:
+#
+# Manager-managed (Worker read-only, Remote->Local pulls):
+#   openclaw.json, mcporter-servers.json, skills/, shared/
+#
+# Worker-managed (Worker read-write, Local->Remote pushes, never pulled):
+#   AGENTS.md, SOUL.md, .openclaw/ (sessions), memory/, skills add output, etc.
+#
+# Local -> Remote: change-triggered sync
+#   - Avoids mc mirror --watch TOCTOU bug (crashes when source files deleted during
+#     atomic ops e.g. npm install, skills add)
+#   - Uses find to detect files modified in last 10s; only runs mc mirror when needed
+#   - Excludes Manager-managed files (openclaw.json, mcporter-servers.json) and
+#     caches (.agents, .cache, .npm, .local, .mc)
+#   - Pushes Worker-managed content including .openclaw sessions (backup to MinIO)
+#
+# Remote -> Local: periodic pull (every 5m), allowlist only
+#   - Pulls only Manager-managed paths; never overwrites Worker-generated content
+#   - Prevents .openclaw session conflict: sessions are backed up up but never
+#     pulled back (would overwrite real-time session state)
+#   - On-demand pull also available via file-sync skill when Manager notifies
+#
 (
     while true; do
         # Check for files modified in the last 10 seconds
         CHANGED=$(find "${WORKSPACE}/" -type f -newermt "10 seconds ago" 2>/dev/null | head -1)
         if [ -n "${CHANGED}" ]; then
             if ! mc mirror "${WORKSPACE}/" "hiclaw/hiclaw-storage/agents/${WORKER_NAME}/" --overwrite \
-                --exclude "openclaw.json" --exclude "AGENTS.md" --exclude "SOUL.md" \
-                --exclude "mcporter-servers.json" --exclude ".agents/**" \
+                --exclude "openclaw.json" --exclude "mcporter-servers.json" --exclude ".agents/**" \
                 --exclude ".cache/**" --exclude ".npm/**" \
                 --exclude ".local/**" --exclude ".mc/**" 2>&1; then
                 log "WARNING: Local->Remote sync failed"
@@ -117,16 +132,17 @@ log "HOME set to ${HOME} (workspace files will be synced to MinIO)"
 ) &
 log "Local->Remote change-triggered sync started (PID: $!)"
 
-# Remote -> Local: periodic pull (configs from Manager + shared data)
-# On-demand pull via file-sync skill when Manager notifies
+# Remote -> Local: periodic pull (allowlist, see block above)
 (
     while true; do
         sleep 300
-        mc mirror "hiclaw/hiclaw-storage/agents/${WORKER_NAME}/" "${WORKSPACE}/" --overwrite --newer-than "5m" 2>/dev/null || true
+        mc cp "hiclaw/hiclaw-storage/agents/${WORKER_NAME}/openclaw.json" "${WORKSPACE}/openclaw.json" 2>/dev/null || true
+        mc cp "hiclaw/hiclaw-storage/agents/${WORKER_NAME}/mcporter-servers.json" "${WORKSPACE}/mcporter-servers.json" 2>/dev/null || true
+        mc mirror "hiclaw/hiclaw-storage/agents/${WORKER_NAME}/skills/" "${WORKSPACE}/skills/" --overwrite 2>/dev/null || true
         mc mirror "hiclaw/hiclaw-storage/shared/" "${HICLAW_ROOT}/shared/" --overwrite --newer-than "5m" 2>/dev/null || true
     done
 ) &
-log "Remote->Local periodic sync started (every 5m, PID: $!)"
+log "Remote->Local periodic sync started (Manager-managed files only, every 5m, PID: $!)"
 
 # ============================================================
 # Step 4: Configure mcporter (MCP tool CLI)

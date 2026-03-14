@@ -4,3 +4,6 @@ Record image-affecting changes to `manager/`, `worker/`, `openclaw-base/` here b
 
 ---
 
+- fix(worker): Remote->Local sync pulls Manager-managed files only (allowlist) to avoid overwriting Worker-generated content (e.g. .openclaw sessions, memory)
+- fix(copaw): align sync ownership with OpenClaw worker (AGENTS.md/SOUL.md Worker-managed, push but never pull; allowlist for Remote->Local)
+
