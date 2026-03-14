@@ -146,10 +146,15 @@ log "Remote->Local periodic sync started (Manager-managed files only, every 5m, 
 
 # ============================================================
 # Step 4: Configure mcporter (MCP tool CLI)
+# Always set MCPORTER_CONFIG so mcporter commands work after file-sync
+# pulls the config. The file may not exist at startup but will appear
+# when Manager configures MCP servers and Worker runs file-sync.
 # ============================================================
-if [ -f "${WORKSPACE}/mcporter-servers.json" ]; then
-    log "Configuring mcporter with MCP Server endpoints..."
-    export MCPORTER_CONFIG="${WORKSPACE}/mcporter-servers.json"
+export MCPORTER_CONFIG="${WORKSPACE}/mcporter-servers.json"
+if [ -f "${MCPORTER_CONFIG}" ]; then
+    log "mcporter configured: ${MCPORTER_CONFIG}"
+else
+    log "mcporter config not yet available (will be pulled via file-sync when MCP servers are configured)"
 fi
 
 # ============================================================

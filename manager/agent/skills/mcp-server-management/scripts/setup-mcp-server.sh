@@ -345,6 +345,7 @@ if [ -f "${REGISTRY_FILE}" ]; then
                 log "  Updated mcporter-servers.json for ${wname}"
             else
                 log "  WARNING: Failed to update mcporter-servers.json for ${wname}"
+                continue
             fi
         else
             # Create new mcporter-servers.json for worker
@@ -356,6 +357,10 @@ if [ -f "${REGISTRY_FILE}" ]; then
                 }}}' > "${MCPORTER_FILE}"
             log "  Created mcporter-servers.json for ${wname}"
         fi
+        # Push to MinIO immediately (don't rely on mc mirror --watch)
+        mc cp "${MCPORTER_FILE}" "hiclaw/hiclaw-storage/agents/${wname}/mcporter-servers.json" 2>/dev/null \
+            && log "  Pushed mcporter-servers.json to MinIO for ${wname}" \
+            || log "  WARNING: Failed to push mcporter-servers.json to MinIO for ${wname}"
     done
 else
     log "  No workers-registry.json found, skipping Worker authorization"

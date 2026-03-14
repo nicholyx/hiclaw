@@ -10,6 +10,7 @@ Record image-affecting changes to `manager/`, `worker/`, `openclaw-base/` here b
 - fix(manager): switch Matrix room preset from `private_chat` back to `trusted_private_chat` so Workers are auto-joined without needing to accept invites; use `power_level_content_override` to keep Workers at power level 0
 - feat(manager): add unified `setup-mcp-server.sh` script to mcp-server-management skill for runtime MCP server creation/update (GitHub as special case with DNS service source); simplify SKILL.md to script-first approach
 - refactor(manager): remove `credential-key` positional arg from `setup-mcp-server.sh` — use unified `accessToken` key for all YAML configs
-- feat(manager): `setup-mcp-server.sh` now generates Manager's own mcporter-servers.json, creates Worker mcporter config if missing, reads Worker gateway key from creds file instead of registry
+- feat(manager): `setup-mcp-server.sh` now generates Manager's own mcporter-servers.json, creates Worker mcporter config if missing, reads Worker gateway key from creds file instead of registry; pushes to MinIO via `mc cp`
+- fix(worker): always set MCPORTER_CONFIG env var in worker-entrypoint.sh (even if file not yet present) so mcporter works after file-sync pulls config
 - feat(manager): add `--no-reasoning` flag to model-switch and worker-model-switch scripts to allow disabling reasoning; patch `reasoning` field in openclaw.json during model switch
 
