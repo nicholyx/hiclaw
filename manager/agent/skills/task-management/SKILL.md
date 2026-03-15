@@ -9,12 +9,39 @@ description: Assign and track tasks for Worker Agents. Use when the human admin 
 
 **Trigger**: Admin gives a task without naming a Worker.
 
-1. Check existing Workers and workload: `cat ~/workers-registry.json && bash /opt/hiclaw/agent/skills/task-management/scripts/manage-state.sh --action list`
-2. Present options to admin:
-   - **Option A** — Assign to an idle existing Worker (list name + role + status)
-   - **Option B** — Create a new Worker (suggest name/role/skills/model based on task type; ask about find-skills, see Step 4)
-   - **Option C** — Handle it yourself (note: broader system access than Workers; use isolated Worker for untrusted inputs)
-3. Act on choice: A → container check then assign; B → create Worker then assign; C → work directly (no task directory needed)
+Run the find-worker script to get a consolidated view of all Workers — registry info, active tasks, container status, and role — in one call:
+
+```bash
+# All workers with full availability info
+bash /opt/hiclaw/agent/skills/task-management/scripts/find-worker.sh
+
+# Filter by required skills (only show workers that have ALL listed skills)
+bash /opt/hiclaw/agent/skills/task-management/scripts/find-worker.sh --skills github-operations,git-delegation
+```
+
+The output is JSON with a `summary` (idle/busy/stopped/unavailable counts) and a `workers` array. Each worker entry includes:
+
+| Field | Meaning |
+|-------|---------|
+| `availability` | `idle` (ready to assign), `busy` (has finite tasks), `stopped` (needs wake-up), `unavailable` (container gone, needs recreate) |
+| `role` | First line from SOUL.md's `## Role` section — use this to match task requirements |
+| `skills` | Skill list from registry — use this to check capability fit |
+| `finite_tasks` / `infinite_tasks` | Current workload counts |
+| `active_tasks` | List of `{task_id, type, title}` for tasks currently assigned |
+| `container_status` | Raw status: `running`, `stopped`, `not_found`, `remote`, `unknown` |
+
+**Decision flow based on output:**
+
+1. **Idle workers exist** → pick the best match by role + skills, present to admin as **Option A**
+2. **Only busy workers** → present workload info, suggest **Option B** (create new Worker) or wait
+3. **No workers at all** → suggest **Option B** (create new Worker) or **Option C** (handle it yourself)
+
+Present options to admin:
+- **Option A** — Assign to an idle existing Worker (show name + role + skills + current workload from the script output)
+- **Option B** — Create a new Worker (suggest name/role/skills/model based on task type; ask about find-skills, see Step 4)
+- **Option C** — Handle it yourself (note: broader system access than Workers; use isolated Worker for untrusted inputs)
+
+Act on choice: A → ensure container ready then assign; B → create Worker then assign; C → work directly (no task directory needed).
 
 **Skip Step 0 when**: admin explicitly names a Worker, says "do it yourself", or it's a heartbeat-triggered infinite task. In YOLO mode, decide autonomously.
 
@@ -28,10 +55,17 @@ Ask admin: enable find-skills (recommended) or disable; optionally provide custo
 
 ## Before Assigning Tasks: Container Status Check
 
-1. Check status: `bash -c 'source /opt/hiclaw/scripts/lib/container-api.sh && container_status_worker "<name>"'`
-2. **stopped** → wake up: `lifecycle-worker.sh --action start --worker <name>`, wait 30s, then assign
-3. **not_found** → notify admin, Worker must be recreated via `create-worker.sh`
-4. **running** or no container API → assign directly
+The `find-worker.sh` output already includes `container_status` and `availability`. Use it directly:
+
+1. `availability = "idle"` or `"busy"` → container is running, assign directly
+2. `availability = "stopped"` → wake up first: `lifecycle-worker.sh --action start --worker <name>`, wait 30s, then assign
+3. `availability = "unavailable"` → notify admin, Worker must be recreated via `create-worker.sh`
+
+If you already ran `find-worker.sh` in Step 0, you do NOT need a separate container status check — the information is already in the output. Only run a standalone check when assigning to an explicitly named Worker (Step 0 was skipped):
+
+```bash
+bash -c 'source /opt/hiclaw/scripts/lib/container-api.sh && container_status_worker "<name>"'
+```
 
 ---
 
