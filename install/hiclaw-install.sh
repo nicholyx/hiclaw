@@ -1078,10 +1078,23 @@ generate_key() {
 
 # Detect container runtime socket on the host
 detect_socket() {
+    # Check for Podman
     if [ -S "/run/podman/podman.sock" ]; then
         echo "/run/podman/podman.sock"
+    # Check for standard Docker socket
     elif [ -S "/var/run/docker.sock" ]; then
         echo "/var/run/docker.sock"
+    else
+        # Try to get socket from current active docker context, Example: OrbStack returns "unix:///Users/xxx/.orbstack/run/docker.sock"
+        # Note: docker context ls outputs empty lines for non-current contexts,
+        # so we use 'grep .' to filter them out before extracting the path
+        if command -v docker >/dev/null 2>&1; then
+            local socket_path
+            socket_path=$(docker context ls --format '{{if .Current}}{{.DockerEndpoint}}{{end}}' 2>/dev/null | grep . | sed 's|^unix://||')
+            if [ -n "${socket_path}" ] && [ -S "${socket_path}" ]; then
+                echo "${socket_path}"
+            fi
+        fi
     fi
 }
 
