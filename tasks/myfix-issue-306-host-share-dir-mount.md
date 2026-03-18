@@ -28,7 +28,7 @@
 - [x] 编写测试 (test-driven-development) - 已完成，创建了单元测试和集成测试
 - [x] 实现修复 - 已完成，修复了 bash 和 PowerShell 脚本
 - [x] 验证通过 (verification-before-completion) - 已完成，所有测试通过
-- [ ] 代码审查 (requesting-code-review)
+- [x] 代码审查 (requesting-code-review) - 已完成，修复了审查发现的问题
 
 ## 进度记录
 
@@ -38,6 +38,7 @@
 - 2026-03-18: 编写 TDD 测试用例
 - 2026-03-18: 实现修复（bash 和 PowerShell 脚本）
 - 2026-03-18: 验证测试通过
+- 2026-03-18: 代码审查完成，修复了审查发现的问题（i18n 消息不准确）
 
 ## 修改的文件
 
