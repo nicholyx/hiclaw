@@ -16,6 +16,10 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+# Instance name for multi-instance support
+$script:MANAGER_NAME = if ($env:HICLAW_MANAGER_NAME) { $env:HICLAW_MANAGER_NAME } else { "hiclaw" }
+$script:MANAGER_CONTAINER_NAME = "$($script:MANAGER_NAME)-manager"
+
 # ============================================================
 # Utility functions
 # ============================================================
@@ -34,7 +38,7 @@ function New-RandomHex {
 
 function Invoke-MgrExec {
     param([string]$Cmd)
-    $result = & $script:ContainerCmd exec hiclaw-manager bash -c $Cmd 2>&1
+    $result = & $script:ContainerCmd exec $script:MANAGER_CONTAINER_NAME bash -c $Cmd 2>&1
     return ($result -join "`n")
 }
 
@@ -42,7 +46,7 @@ function Send-ToMgr {
     param([string]$Content, [string]$DestPath)
     $tmpFile = [System.IO.Path]::GetTempFileName()
     [System.IO.File]::WriteAllText($tmpFile, $Content)
-    Get-Content -Raw $tmpFile | & $script:ContainerCmd exec -i hiclaw-manager sh -c "cat > $DestPath"
+    Get-Content -Raw $tmpFile | & $script:ContainerCmd exec -i $script:MANAGER_CONTAINER_NAME sh -c "cat > $DestPath"
     Remove-Item $tmpFile -Force
 }
 
@@ -106,7 +110,7 @@ if (-not $Zip) {
     exit 1
 }
 
-if (-not $EnvFile) { $EnvFile = Join-Path $HOME "hiclaw-manager.env" }
+if (-not $EnvFile) { $EnvFile = Join-Path $HOME "$($script:MANAGER_NAME)-manager.env" }
 $AutoYes = $Yes -or ($env:HICLAW_NON_INTERACTIVE -eq "1")
 
 # Download ZIP if URL provided
@@ -157,8 +161,8 @@ Get-Content $EnvFile | ForEach-Object {
 
 # Check Manager container
 Write-Log (Get-Msg "preflight.manager.check")
-$mgrRunning = & $script:ContainerCmd ps --filter "name=hiclaw-manager" --format "{{.Names}}" 2>$null
-if ($mgrRunning -notmatch "hiclaw-manager") { Write-Err (Get-Msg "preflight.manager.down") }
+$mgrRunning = & $script:ContainerCmd ps --filter "name=$($script:MANAGER_CONTAINER_NAME)" --format "{{.Names}}" 2>$null
+if ($mgrRunning -notmatch $script:MANAGER_CONTAINER_NAME) { Write-Err (Get-Msg "preflight.manager.down") }
 Write-Log "  OK"
 
 # Validate ZIP
@@ -377,7 +381,7 @@ if (Test-Path $skillsDir) {
         $tarTmp = [System.IO.Path]::GetTempFileName() + ".tar"
         & tar -C $_.FullName -cf $tarTmp . 2>$null
         if (Test-Path $tarTmp) {
-            Get-Content -Raw -Encoding Byte $tarTmp | & $script:ContainerCmd exec -i hiclaw-manager sh -c "mkdir -p /tmp/migrate-skill && tar -C /tmp/migrate-skill -xf - && mc mirror /tmp/migrate-skill/ '$StoragePrefix/agents/$Name/custom-skills/$skillName/' --overwrite 2>/dev/null; rm -rf /tmp/migrate-skill"
+            Get-Content -Raw -Encoding Byte $tarTmp | & $script:ContainerCmd exec -i $script:MANAGER_CONTAINER_NAME sh -c "mkdir -p /tmp/migrate-skill && tar -C /tmp/migrate-skill -xf - && mc mirror /tmp/migrate-skill/ '$StoragePrefix/agents/$Name/custom-skills/$skillName/' --overwrite 2>/dev/null; rm -rf /tmp/migrate-skill"
             Remove-Item $tarTmp -Force
             Write-Log "  Skill pushed: $skillName"
         }

@@ -31,6 +31,7 @@
 #   HICLAW_PORT_GATEWAY       Host port for Higress gateway (default: 18080)
 #   HICLAW_PORT_CONSOLE       Host port for Higress console (default: 18001)
 #   HICLAW_PORT_ELEMENT_WEB   Host port for Element Web direct access (default: 18088)
+#   HICLAW_MANAGER_NAME       Instance name prefix for multi-instance support (default: hiclaw)
 
 #Requires -Version 5.1
 
@@ -61,7 +62,12 @@ param(
 $script:HICLAW_VERSION = if ($env:HICLAW_VERSION) { $env:HICLAW_VERSION } else { "latest" }
 $script:HICLAW_NON_INTERACTIVE = if ($env:HICLAW_NON_INTERACTIVE -eq "1" -or $NonInteractive) { $true } else { $false }
 $script:HICLAW_MOUNT_SOCKET = if ($env:HICLAW_MOUNT_SOCKET -eq "0") { $false } else { $true }
-$script:HICLAW_ENV_FILE = if ($EnvFile) { $EnvFile } elseif ($env:HICLAW_ENV_FILE) { $env:HICLAW_ENV_FILE } else { "$env:USERPROFILE\hiclaw-manager.env" }
+
+# Instance name for multi-instance support
+$script:MANAGER_NAME = if ($env:HICLAW_MANAGER_NAME) { $env:HICLAW_MANAGER_NAME } else { "hiclaw" }
+$script:MANAGER_CONTAINER_NAME = "$($script:MANAGER_NAME)-manager"
+
+$script:HICLAW_ENV_FILE = if ($EnvFile) { $EnvFile } elseif ($env:HICLAW_ENV_FILE) { $env:HICLAW_ENV_FILE } else { "$env:USERPROFILE\$($script:MANAGER_NAME)-manager.env" }
 
 # ANSI escape character for PowerShell 5.1+ compatibility
 $script:ESC = [char]0x1B
@@ -654,9 +660,10 @@ function ConvertTo-DockerPath {
 
 function Wait-ManagerReady {
     param(
-        [string]$Container = "hiclaw-manager",
+        [string]$Container = "",
         [int]$Timeout = 300
     )
+    if ([string]::IsNullOrEmpty($Container)) { $Container = $script:MANAGER_CONTAINER_NAME }
 
     $elapsed = 0
     Write-Log (Get-Msg "install.wait_ready" -f $Timeout)
@@ -683,9 +690,10 @@ function Wait-ManagerReady {
 
 function Wait-MatrixReady {
     param(
-        [string]$Container = "hiclaw-manager",
+        [string]$Container = "",
         [int]$Timeout = 300
     )
+    if ([string]::IsNullOrEmpty($Container)) { $Container = $script:MANAGER_CONTAINER_NAME }
 
     $elapsed = 0
     Write-Log (Get-Msg "install.wait_matrix" -f $Timeout)
@@ -1031,13 +1039,14 @@ function New-OpenAICompatProvider {
 
 function Send-WelcomeMessage {
     param(
-        [string]$Container = "hiclaw-manager",
+        [string]$Container = "",
         [string]$AdminUser,
         [string]$AdminPassword,
         [string]$MatrixDomain,
         [string]$Timezone,
         [string]$Language
     )
+    if ([string]::IsNullOrEmpty($Container)) { $Container = $script:MANAGER_CONTAINER_NAME }
 
     # Skip if soul already configured
     $null = docker exec $Container test -f /root/manager-workspace/soul-configured 2>$null
@@ -1205,9 +1214,9 @@ function Install-Manager {
         # Check existing env file for saved language preference (upgrade scenario)
         $_envFile = $script:HICLAW_ENV_FILE
         # Migrate from legacy location (current directory) if needed
-        if (-not (Test-Path $_envFile) -and (Test-Path ".\hiclaw-manager.env")) {
-            Write-Log "Migrating hiclaw-manager.env to $_envFile..."
-            Move-Item ".\hiclaw-manager.env" $_envFile -ErrorAction SilentlyContinue
+        if (-not (Test-Path $_envFile) -and (Test-Path ".\$($script:MANAGER_NAME)-manager.env")) {
+            Write-Log "Migrating $($script:MANAGER_NAME)-manager.env to $_envFile..."
+            Move-Item ".\$($script:MANAGER_NAME)-manager.env" $_envFile -ErrorAction SilentlyContinue
         }
         if (Test-Path $_envFile) {
             $_savedLang = (Get-Content $_envFile | Select-String "^HICLAW_LANGUAGE=" | ForEach-Object {
@@ -1328,15 +1337,15 @@ function Install-Manager {
 
     # Check for existing installation
     # Migrate from legacy location (current directory) if needed
-    if (-not (Test-Path $script:HICLAW_ENV_FILE) -and (Test-Path ".\hiclaw-manager.env")) {
-        Write-Log "Migrating hiclaw-manager.env to $($script:HICLAW_ENV_FILE)..."
-        Move-Item ".\hiclaw-manager.env" $script:HICLAW_ENV_FILE -ErrorAction SilentlyContinue
+    if (-not (Test-Path $script:HICLAW_ENV_FILE) -and (Test-Path ".\$($script:MANAGER_NAME)-manager.env")) {
+        Write-Log "Migrating $($script:MANAGER_NAME)-manager.env to $($script:HICLAW_ENV_FILE)..."
+        Move-Item ".\$($script:MANAGER_NAME)-manager.env" $script:HICLAW_ENV_FILE -ErrorAction SilentlyContinue
     }
     if (Test-Path $script:HICLAW_ENV_FILE) {
         Write-Log (Get-Msg "install.existing.detected" -f $script:HICLAW_ENV_FILE)
 
         # Check for running containers
-        $runningManager = docker ps --format "{{.Names}}" 2>$null | Select-String "^hiclaw-manager$"
+        $runningManager = docker ps --format "{{.Names}}" 2>$null | Select-String "^$($script:MANAGER_CONTAINER_NAME)$"
         $runningWorkers = docker ps --format "{{.Names}}" 2>$null | Select-String "^hiclaw-worker-"
         $existingWorkers = docker ps -a --format "{{.Names}}" 2>$null | Select-String "^hiclaw-worker-"
 
@@ -1385,7 +1394,7 @@ function Install-Manager {
                 Write-Log (Get-Msg "install.reinstall.performing")
 
                 # Get existing workspace
-                $existingWorkspace = "$env:USERPROFILE\hiclaw-manager"
+                $existingWorkspace = "$env:USERPROFILE\$($script:MANAGER_NAME)-manager"
                 if (Test-Path $script:HICLAW_ENV_FILE) {
                     $envContent = Get-Content $script:HICLAW_ENV_FILE
                     $wsLine = $envContent | Select-String "^HICLAW_WORKSPACE_DIR="
@@ -1396,7 +1405,7 @@ function Install-Manager {
 
                 Write-Host ""
                 Write-Host "$($script:ESC)[33m$(Get-Msg 'install.reinstall.warn_stop')$($script:ESC)[0m"
-                if ($runningManager) { Write-Host "$($script:ESC)[33m   - hiclaw-manager (manager)$($script:ESC)[0m" }
+                if ($runningManager) { Write-Host "$($script:ESC)[33m   - $($script:MANAGER_CONTAINER_NAME) (manager)$($script:ESC)[0m" }
                 $runningWorkers | ForEach-Object { Write-Host "$($script:ESC)[33m   - $_ (worker)$($script:ESC)[0m" }
 
                 Write-Host ""
@@ -1419,8 +1428,8 @@ function Install-Manager {
                 Write-Log (Get-Msg "install.reinstall.confirmed")
 
                 # Stop and remove all containers
-                docker stop hiclaw-manager *>$null
-                docker rm hiclaw-manager *>$null
+                docker stop $script:MANAGER_CONTAINER_NAME *>$null
+                docker rm $script:MANAGER_CONTAINER_NAME *>$null
 
                 docker ps -a --format "{{.Names}}" 2>$null | Select-String "^hiclaw-worker-" | ForEach-Object {
                     docker stop $_ *>$null
@@ -1429,9 +1438,9 @@ function Install-Manager {
                 }
 
                 # Remove Docker volume
-                if (docker volume ls -q 2>$null | Select-String "^hiclaw-data$") {
+                if (docker volume ls -q 2>$null | Select-String "^$($script:MANAGER_NAME)-data$") {
                     Write-Log (Get-Msg "install.reinstall.removing_volume")
-                    docker volume rm hiclaw-data *>$null
+                    docker volume rm "$($script:MANAGER_NAME)-data" *>$null
                 }
 
                 # Remove workspace
@@ -1483,8 +1492,8 @@ function Install-Manager {
             if ($script:HICLAW_NON_INTERACTIVE) {
                 Write-Log (Get-Msg "install.orphan_volume.clean_noninteractive")
                 # Stop containers that may reference the volume
-                docker stop hiclaw-manager *>$null
-                docker rm hiclaw-manager *>$null
+                docker stop $script:MANAGER_CONTAINER_NAME *>$null
+                docker rm $script:MANAGER_CONTAINER_NAME *>$null
                 docker ps -a --format "{{.Names}}" 2>$null | Select-String "^hiclaw-worker-" | ForEach-Object {
                     docker stop $_.ToString().Trim() *>$null
                     docker rm $_.ToString().Trim() *>$null
@@ -1505,8 +1514,8 @@ function Install-Manager {
                 switch -Regex ($orphanChoice) {
                     "^(1|clean)$" {
                         # Stop containers that may reference the volume
-                        docker stop hiclaw-manager *>$null
-                        docker rm hiclaw-manager *>$null
+                        docker stop $script:MANAGER_CONTAINER_NAME *>$null
+                        docker rm $script:MANAGER_CONTAINER_NAME *>$null
                         docker ps -a --format "{{.Names}}" 2>$null | Select-String "^hiclaw-worker-" | ForEach-Object {
                             docker stop $_.ToString().Trim() *>$null
                             docker rm $_.ToString().Trim() *>$null
@@ -1795,7 +1804,7 @@ function Install-Manager {
 
     # Manager Workspace
     Write-Log (Get-Msg "workspace.title")
-    $defaultWorkspace = "$env:USERPROFILE\hiclaw-manager"
+    $defaultWorkspace = "$env:USERPROFILE\$($script:MANAGER_NAME)-manager"
 
     if (-not $script:HICLAW_NON_INTERACTIVE -and -not $script:HICLAW_QUICKSTART -and -not $env:HICLAW_WORKSPACE_DIR) {
         $wsInput = Read-Host (Get-Msg "workspace.dir_prompt" -f $defaultWorkspace)
@@ -1923,7 +1932,7 @@ function Install-Manager {
     # Build Docker arguments
     $dockerArgs = @(
         "run", "-d",
-        "--name", "hiclaw-manager",
+        "--name", $script:MANAGER_CONTAINER_NAME,
         "--env-file", $script:HICLAW_ENV_FILE,
         "-e", "HOME=/root/manager-workspace",
         "-w", "/root/manager-workspace",
@@ -2043,11 +2052,11 @@ function Install-Manager {
 
     # Stop and remove existing containers (deferred until after all
     # configuration is collected and images are pulled successfully)
-    $existingContainer = docker ps -a --format "{{.Names}}" 2>$null | Select-String "^hiclaw-manager$"
+    $existingContainer = docker ps -a --format "{{.Names}}" 2>$null | Select-String "^$($script:MANAGER_CONTAINER_NAME)$"
     if ($existingContainer) {
         Write-Log (Get-Msg "install.removing_existing")
-        docker stop hiclaw-manager *>$null
-        docker rm hiclaw-manager *>$null
+        docker stop $script:MANAGER_CONTAINER_NAME *>$null
+        docker rm $script:MANAGER_CONTAINER_NAME *>$null
     }
 
     # Stop and remove worker containers saved during upgrade detection
@@ -2066,10 +2075,10 @@ function Install-Manager {
     & docker $dockerArgs
 
     # Wait for ready
-    Wait-ManagerReady -Container "hiclaw-manager"
+    Wait-ManagerReady
 
     # Wait for Matrix server to be ready
-    Wait-MatrixReady -Container "hiclaw-manager"
+    Wait-MatrixReady
 
     # Create OpenAI-compatible provider if needed
     if ($config.LLM_PROVIDER -eq "openai-compat") {
@@ -2077,7 +2086,7 @@ function Install-Manager {
     }
 
     # Send welcome message
-    Send-WelcomeMessage -Container "hiclaw-manager" -AdminUser $config.ADMIN_USER -AdminPassword $config.ADMIN_PASSWORD -MatrixDomain $config.MATRIX_DOMAIN -Timezone $script:HICLAW_TIMEZONE -Language $script:HICLAW_LANGUAGE
+    Send-WelcomeMessage -AdminUser $config.ADMIN_USER -AdminPassword $config.ADMIN_PASSWORD -MatrixDomain $config.MATRIX_DOMAIN -Timezone $script:HICLAW_TIMEZONE -Language $script:HICLAW_LANGUAGE
 
     # Print success message
     Write-Log ""
@@ -2236,11 +2245,11 @@ function Uninstall-HiClaw {
     Write-Log (Get-Msg "uninstall.title")
 
     # Stop and remove manager
-    $manager = docker ps -a --format "{{.Names}}" 2>$null | Select-String "^hiclaw-manager$"
+    $manager = docker ps -a --format "{{.Names}}" 2>$null | Select-String "^$($script:MANAGER_CONTAINER_NAME)$"
     if ($manager) {
         Write-Log (Get-Msg "uninstall.stopping_manager")
-        docker stop hiclaw-manager *>$null
-        docker rm hiclaw-manager *>$null
+        docker stop $script:MANAGER_CONTAINER_NAME *>$null
+        docker rm $script:MANAGER_CONTAINER_NAME *>$null
     }
 
     # Stop and remove workers

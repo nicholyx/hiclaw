@@ -30,12 +30,18 @@
 #   HICLAW_PORT_CONSOLE       Host port for Higress console (default: 18001)
 #   HICLAW_PORT_ELEMENT_WEB   Host port for Element Web direct access (default: 18088)
 #   HICLAW_WORKER_IDLE_TIMEOUT  Worker idle timeout in minutes (default: 720, i.e. 12 hours)
+#   HICLAW_MANAGER_NAME       Instance name prefix for multi-instance support (default: hiclaw)
 
 set -e
 
 HICLAW_VERSION="${HICLAW_VERSION:-latest}"
 HICLAW_NON_INTERACTIVE="${HICLAW_NON_INTERACTIVE:-0}"
 HICLAW_MOUNT_SOCKET="${HICLAW_MOUNT_SOCKET:-1}"
+
+# Instance name for multi-instance support
+# Derived container name: {HICLAW_MANAGER_NAME}-manager
+MANAGER_NAME="${HICLAW_MANAGER_NAME:-hiclaw}"
+MANAGER_CONTAINER_NAME="${MANAGER_NAME}-manager"
 
 # ============================================================
 # Log all output to file
@@ -132,10 +138,10 @@ detect_language() {
 # Language priority: env var > existing env file > timezone detection
 if [ -z "${HICLAW_LANGUAGE}" ]; then
     # Check existing env file for saved language preference (upgrade scenario)
-    _env_file="${HICLAW_ENV_FILE:-${HOME}/hiclaw-manager.env}"
+    _env_file="${HICLAW_ENV_FILE:-${HOME}/${MANAGER_NAME}-manager.env}"
     # Migrate from legacy location (current directory) if needed
-    if [ ! -f "${_env_file}" ] && [ -f "./hiclaw-manager.env" ]; then
-        mv "./hiclaw-manager.env" "${_env_file}" 2>/dev/null || true
+    if [ ! -f "${_env_file}" ] && [ -f "./${MANAGER_NAME}-manager.env" ]; then
+        mv "./${MANAGER_NAME}-manager.env" "${_env_file}" 2>/dev/null || true
     fi
     if [ -f "${_env_file}" ]; then
         _saved_lang=$(grep '^HICLAW_LANGUAGE=' "${_env_file}" 2>/dev/null | cut -d= -f2-)
@@ -807,7 +813,7 @@ prompt_custom_model_params() {
 wait_manager_ready() {
     local timeout="${HICLAW_READY_TIMEOUT:-300}"
     local elapsed=0
-    local container="${1:-hiclaw-manager}"
+    local container="${1:-${MANAGER_CONTAINER_NAME}}"
 
     log "$(msg install.wait_ready "${timeout}")"
 
@@ -829,7 +835,7 @@ wait_manager_ready() {
 wait_matrix_ready() {
     local timeout="${HICLAW_READY_TIMEOUT:-300}"
     local elapsed=0
-    local container="${1:-hiclaw-manager}"
+    local container="${1:-${MANAGER_CONTAINER_NAME}}"
 
     log "$(msg install.wait_matrix "${timeout}")"
 
@@ -852,7 +858,7 @@ wait_matrix_ready() {
 # ============================================================
 
 send_welcome_message() {
-    local container="hiclaw-manager"
+    local container="${MANAGER_CONTAINER_NAME}"
 
     # Skip if Manager has already completed soul configuration
     if ${DOCKER_CMD} exec "${container}" test -f /root/manager-workspace/soul-configured 2>/dev/null; then
@@ -1293,11 +1299,11 @@ install_manager() {
     fi
 
     # Check if Manager is already installed (by env file existence)
-    local existing_env="${HICLAW_ENV_FILE:-${HOME}/hiclaw-manager.env}"
+    local existing_env="${HICLAW_ENV_FILE:-${HOME}/${MANAGER_NAME}-manager.env}"
     # Migrate from legacy location (current directory) if needed
-    if [ ! -f "${existing_env}" ] && [ -f "./hiclaw-manager.env" ]; then
-        log "Migrating hiclaw-manager.env from current directory to ${existing_env}..."
-        mv "./hiclaw-manager.env" "${existing_env}"
+    if [ ! -f "${existing_env}" ] && [ -f "./${MANAGER_NAME}-manager.env" ]; then
+        log "Migrating ${MANAGER_NAME}-manager.env from current directory to ${existing_env}..."
+        mv "./${MANAGER_NAME}-manager.env" "${existing_env}"
     fi
     if [ -f "${existing_env}" ]; then
         log "$(msg install.existing.detected "${existing_env}")"
@@ -1306,8 +1312,8 @@ install_manager() {
         local running_manager=""
         local running_workers=""
         local existing_workers=""
-        if ${DOCKER_CMD} ps --format '{{.Names}}' | grep -q "^hiclaw-manager$"; then
-            running_manager="hiclaw-manager"
+        if ${DOCKER_CMD} ps --format '{{.Names}}' | grep -q "^${MANAGER_CONTAINER_NAME}$"; then
+            running_manager="${MANAGER_CONTAINER_NAME}"
         fi
         running_workers=$(${DOCKER_CMD} ps --format '{{.Names}}' | grep "^hiclaw-worker-" || true)
         existing_workers=$(${DOCKER_CMD} ps -a --format '{{.Names}}' | grep "^hiclaw-worker-" || true)
@@ -1364,7 +1370,7 @@ install_manager() {
                     existing_workspace=$(grep '^HICLAW_WORKSPACE_DIR=' "${existing_env}" 2>/dev/null | cut -d= -f2-)
                 fi
                 if [ -z "${existing_workspace}" ]; then
-                    existing_workspace="${HOME}/hiclaw-manager"
+                    existing_workspace="${HOME}/${MANAGER_NAME}-manager"
                 fi
 
                 # Warn about running containers
@@ -1393,8 +1399,8 @@ install_manager() {
                 log "$(msg install.reinstall.confirmed)"
 
                 # Stop and remove manager container
-                ${DOCKER_CMD} stop hiclaw-manager 2>/dev/null || true
-                ${DOCKER_CMD} rm hiclaw-manager 2>/dev/null || true
+                ${DOCKER_CMD} stop "${MANAGER_CONTAINER_NAME}" 2>/dev/null || true
+                ${DOCKER_CMD} rm "${MANAGER_CONTAINER_NAME}" 2>/dev/null || true
 
                 # Stop and remove all worker containers
                 for w in $(${DOCKER_CMD} ps -a --format '{{.Names}}' | grep "^hiclaw-worker-" || true); do
@@ -1441,8 +1447,8 @@ install_manager() {
             if [ "${HICLAW_NON_INTERACTIVE}" = "1" ]; then
                 log "$(msg install.orphan_volume.clean_noninteractive)"
                 # Stop containers that may reference the volume
-                ${DOCKER_CMD} stop hiclaw-manager 2>/dev/null || true
-                ${DOCKER_CMD} rm hiclaw-manager 2>/dev/null || true
+                ${DOCKER_CMD} stop "${MANAGER_CONTAINER_NAME}" 2>/dev/null || true
+                ${DOCKER_CMD} rm "${MANAGER_CONTAINER_NAME}" 2>/dev/null || true
                 for w in $(${DOCKER_CMD} ps -a --format '{{.Names}}' | grep "^hiclaw-worker-" || true); do
                     ${DOCKER_CMD} stop "${w}" 2>/dev/null || true
                     ${DOCKER_CMD} rm "${w}" 2>/dev/null || true
@@ -1462,8 +1468,8 @@ install_manager() {
                 case "${ORPHAN_CHOICE}" in
                     1|clean)
                         # Stop containers that may reference the volume
-                        ${DOCKER_CMD} stop hiclaw-manager 2>/dev/null || true
-                        ${DOCKER_CMD} rm hiclaw-manager 2>/dev/null || true
+                        ${DOCKER_CMD} stop "${MANAGER_CONTAINER_NAME}" 2>/dev/null || true
+                        ${DOCKER_CMD} rm "${MANAGER_CONTAINER_NAME}" 2>/dev/null || true
                         for w in $(${DOCKER_CMD} ps -a --format '{{.Names}}' | grep "^hiclaw-worker-" || true); do
                             ${DOCKER_CMD} stop "${w}" 2>/dev/null || true
                             ${DOCKER_CMD} rm "${w}" 2>/dev/null || true
@@ -1757,17 +1763,17 @@ install_manager() {
         HICLAW_DATA_DIR="${HICLAW_DATA_DIR:-hiclaw-data}"
         export HICLAW_DATA_DIR
     fi
-    HICLAW_DATA_DIR="${HICLAW_DATA_DIR:-hiclaw-data}"
+    HICLAW_DATA_DIR="${HICLAW_DATA_DIR:-${MANAGER_NAME}-data}"
     log "$(msg data.volume_using "${HICLAW_DATA_DIR}")"
 
     # Manager workspace directory (skills, memory, state — host-editable)
     log "$(msg workspace.title)"
     if [ "${HICLAW_NON_INTERACTIVE}" != "1" ] && [ "${HICLAW_QUICKSTART}" != "1" ] && [ -z "${HICLAW_WORKSPACE_DIR+x}" ]; then
-        read -e -p "$(msg workspace.dir_prompt "${HOME}/hiclaw-manager"): " HICLAW_WORKSPACE_DIR
-        HICLAW_WORKSPACE_DIR="${HICLAW_WORKSPACE_DIR:-${HOME}/hiclaw-manager}"
+        read -e -p "$(msg workspace.dir_prompt "${HOME}/${MANAGER_NAME}-manager"): " HICLAW_WORKSPACE_DIR
+        HICLAW_WORKSPACE_DIR="${HICLAW_WORKSPACE_DIR:-${HOME}/${MANAGER_NAME}-manager}"
         export HICLAW_WORKSPACE_DIR
     elif [ -z "${HICLAW_WORKSPACE_DIR+x}" ]; then
-        HICLAW_WORKSPACE_DIR="${HOME}/hiclaw-manager"
+        HICLAW_WORKSPACE_DIR="${HOME}/${MANAGER_NAME}-manager"
         export HICLAW_WORKSPACE_DIR
     fi
     HICLAW_WORKSPACE_DIR="$(cd "${HICLAW_WORKSPACE_DIR}" 2>/dev/null && pwd || echo "${HICLAW_WORKSPACE_DIR}")"
@@ -1882,7 +1888,7 @@ install_manager() {
     HICLAW_MANAGER_GATEWAY_KEY="${HICLAW_MANAGER_GATEWAY_KEY:-$(generate_key)}"
 
     # Write .env file
-    ENV_FILE="${HICLAW_ENV_FILE:-${HOME}/hiclaw-manager.env}"
+    ENV_FILE="${HICLAW_ENV_FILE:-${HOME}/${MANAGER_NAME}-manager.env}"
     cat > "${ENV_FILE}" << EOF
 # HiClaw Manager Configuration
 # Generated by hiclaw-install.sh on $(date)
@@ -2065,10 +2071,10 @@ EOF
 
     # Stop and remove existing containers (deferred from upgrade detection
     # so that all configuration is collected and images are pulled first)
-    if ${DOCKER_CMD} ps -a --format '{{.Names}}' | grep -q "^hiclaw-manager$"; then
+    if ${DOCKER_CMD} ps -a --format '{{.Names}}' | grep -q "^${MANAGER_CONTAINER_NAME}$"; then
         log "$(msg install.removing_existing)"
-        ${DOCKER_CMD} stop hiclaw-manager 2>/dev/null || true
-        ${DOCKER_CMD} rm hiclaw-manager 2>/dev/null || true
+        ${DOCKER_CMD} stop "${MANAGER_CONTAINER_NAME}" 2>/dev/null || true
+        ${DOCKER_CMD} rm "${MANAGER_CONTAINER_NAME}" 2>/dev/null || true
     fi
 
     # Stop and remove worker containers saved during upgrade detection
@@ -2092,7 +2098,7 @@ EOF
     fi
     # shellcheck disable=SC2086
     ${DOCKER_CMD} run -d \
-        --name hiclaw-manager \
+        --name "${MANAGER_CONTAINER_NAME}" \
         --env-file "${ENV_FILE}" \
         -e HOME=/root/manager-workspace \
         -w /root/manager-workspace \
@@ -2112,10 +2118,10 @@ EOF
     unset _port_prefix
 
     # Wait for Manager agent to be ready
-    wait_manager_ready "hiclaw-manager"
+    wait_manager_ready "${MANAGER_CONTAINER_NAME}"
 
     # Wait for Matrix server to be ready
-    wait_matrix_ready "hiclaw-manager"
+    wait_matrix_ready "${MANAGER_CONTAINER_NAME}"
 
     # Send welcome message to Manager (skipped automatically if soul-configured marker exists)
     send_welcome_message

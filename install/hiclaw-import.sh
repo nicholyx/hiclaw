@@ -30,6 +30,10 @@
 
 set -e
 
+# Instance name for multi-instance support
+MANAGER_NAME="${HICLAW_MANAGER_NAME:-hiclaw}"
+MANAGER_CONTAINER_NAME="${MANAGER_NAME}-manager"
+
 # ============================================================
 # Utility functions
 # ============================================================
@@ -55,17 +59,17 @@ generate_key() {
 
 # Execute command inside the Manager container
 mgr_exec() {
-    ${CONTAINER_CMD} exec hiclaw-manager "$@"
+    ${CONTAINER_CMD} exec "${MANAGER_CONTAINER_NAME}" "$@"
 }
 
 # Execute bash command inside the Manager container
 mgr_bash() {
-    ${CONTAINER_CMD} exec hiclaw-manager bash -c "$1"
+    ${CONTAINER_CMD} exec "${MANAGER_CONTAINER_NAME}" bash -c "$1"
 }
 
 # Pipe stdin into Manager container
 mgr_pipe() {
-    ${CONTAINER_CMD} exec -i hiclaw-manager sh -c "$1"
+    ${CONTAINER_CMD} exec -i "${MANAGER_CONTAINER_NAME}" sh -c "$1"
 }
 
 # ============================================================
@@ -202,7 +206,7 @@ ZIP_FILE="${HICLAW_IMPORT_ZIP:-}"
 WORKER_NAME="${HICLAW_IMPORT_WORKER_NAME:-}"
 PROXY="${HICLAW_IMPORT_PROXY:-}"
 EXTRA_NO_PROXY="${HICLAW_IMPORT_NO_PROXY:-}"
-ENV_FILE="${HICLAW_ENV_FILE:-${HOME}/hiclaw-manager.env}"
+ENV_FILE="${HICLAW_ENV_FILE:-${HOME}/${MANAGER_NAME}-manager.env}"
 BASE_IMAGE_OVERRIDE=""
 SKIP_BUILD=false
 AUTO_YES="${HICLAW_NON_INTERACTIVE:-0}"
@@ -267,7 +271,7 @@ source "${ENV_FILE}"
 
 # Check Manager container is running
 msg "preflight.manager"
-if ! ${CONTAINER_CMD} ps --filter name=hiclaw-manager --format '{{.Names}}' 2>/dev/null | grep -q 'hiclaw-manager'; then
+if ! ${CONTAINER_CMD} ps --filter "name=${MANAGER_CONTAINER_NAME}" --format '{{.Names}}' 2>/dev/null | grep -q "${MANAGER_CONTAINER_NAME}"; then
     msg "preflight.manager.not_running"
     exit 1
 fi
