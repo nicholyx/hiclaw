@@ -356,6 +356,21 @@ msg() {
         "llm.openai.model_prompt.en") text="Default Model ID [gpt-5.4]" ;;
         "llm.openai.base_url_label.zh") text="  Base URL: %s" ;;
         "llm.openai.base_url_label.en") text="  Base URL: %s" ;;
+        # --- Context Window / Max Tokens (for custom models like vLLM) ---
+        "llm.openai.context_window_hint.zh") text="上下文窗口配置（对于 vLLM 等自定义模型很重要）" ;;
+        "llm.openai.context_window_hint.en") text="Context window configuration (important for custom models like vLLM)" ;;
+        "llm.openai.context_window_prompt.zh") text="上下文窗口大小（留空使用默认 150000）" ;;
+        "llm.openai.context_window_prompt.en") text="Context window size (press Enter for default 150000)" ;;
+        "llm.openai.context_window_label.zh") text="  上下文窗口: %s" ;;
+        "llm.openai.context_window_label.en") text="  Context window: %s" ;;
+        "llm.openai.context_window_default.zh") text="  使用默认上下文窗口: 150000" ;;
+        "llm.openai.context_window_default.en") text="  Using default context window: 150000" ;;
+        "llm.openai.max_tokens_prompt.zh") text="最大输出 tokens（留空使用默认 128000）" ;;
+        "llm.openai.max_tokens_prompt.en") text="Max output tokens (press Enter for default 128000)" ;;
+        "llm.openai.max_tokens_label.zh") text="  最大输出 tokens: %s" ;;
+        "llm.openai.max_tokens_label.en") text="  Max output tokens: %s" ;;
+        "llm.openai.max_tokens_default.zh") text="  使用默认最大输出 tokens: 128000" ;;
+        "llm.openai.max_tokens_default.en") text="  Using default max output tokens: 128000" ;;
         # --- Admin Credentials ---
         "admin.title.zh") text="--- 管理员凭据 ---" ;;
         "admin.title.en") text="--- Admin Credentials ---" ;;
@@ -1431,6 +1446,9 @@ install_manager() {
         # Non-interactive mode: use defaults
         HICLAW_LLM_PROVIDER="${HICLAW_LLM_PROVIDER:-qwen}"
         HICLAW_DEFAULT_MODEL="${HICLAW_DEFAULT_MODEL:-qwen3.5-plus}"
+        HICLAW_OPENAI_BASE_URL="${HICLAW_OPENAI_BASE_URL:-}"
+        HICLAW_MODEL_CONTEXT_WINDOW="${HICLAW_MODEL_CONTEXT_WINDOW:-}"
+        HICLAW_MODEL_MAX_TOKENS="${HICLAW_MODEL_MAX_TOKENS:-}"
         log "$(msg llm.provider.qwen_default "${HICLAW_LLM_PROVIDER}")"
         log "$(msg llm.model.default "${HICLAW_DEFAULT_MODEL}")"
         prompt HICLAW_LLM_API_KEY "$(msg llm.apikey_prompt)" "" "true"
@@ -1583,6 +1601,27 @@ install_manager() {
                 HICLAW_DEFAULT_MODEL="${HICLAW_DEFAULT_MODEL:-gpt-5.4}"
                 log "$(msg llm.openai.base_url_label "${HICLAW_OPENAI_BASE_URL}")"
                 log "$(msg llm.model.label "${HICLAW_DEFAULT_MODEL}")"
+
+                # Ask for context window and max tokens for custom models
+                # These are required for proper token limit handling
+                echo ""
+                echo "$(msg llm.openai.context_window_hint)"
+                prompt_optional HICLAW_MODEL_CONTEXT_WINDOW "$(msg llm.openai.context_window_prompt)" ""
+                if [ -n "${HICLAW_MODEL_CONTEXT_WINDOW}" ]; then
+                    log "$(msg llm.openai.context_window_label "${HICLAW_MODEL_CONTEXT_WINDOW}")"
+                else
+                    log "$(msg llm.openai.context_window_default)"
+                    HICLAW_MODEL_CONTEXT_WINDOW="150000"
+                fi
+
+                prompt_optional HICLAW_MODEL_MAX_TOKENS "$(msg llm.openai.max_tokens_prompt)" ""
+                if [ -n "${HICLAW_MODEL_MAX_TOKENS}" ]; then
+                    log "$(msg llm.openai.max_tokens_label "${HICLAW_MODEL_MAX_TOKENS}")"
+                else
+                    log "$(msg llm.openai.max_tokens_default)"
+                    HICLAW_MODEL_MAX_TOKENS="128000"
+                fi
+
                 log ""
                 prompt HICLAW_LLM_API_KEY "$(msg llm.apikey_prompt)" "" "true"
                 test_llm_connectivity "${HICLAW_OPENAI_BASE_URL}" "${HICLAW_LLM_API_KEY}" "${HICLAW_DEFAULT_MODEL}"
@@ -1817,6 +1856,8 @@ HICLAW_LLM_PROVIDER=${HICLAW_LLM_PROVIDER}
 HICLAW_DEFAULT_MODEL=${HICLAW_DEFAULT_MODEL}
 HICLAW_LLM_API_KEY=${HICLAW_LLM_API_KEY}
 HICLAW_OPENAI_BASE_URL=${HICLAW_OPENAI_BASE_URL:-}
+HICLAW_MODEL_CONTEXT_WINDOW=${HICLAW_MODEL_CONTEXT_WINDOW:-}
+HICLAW_MODEL_MAX_TOKENS=${HICLAW_MODEL_MAX_TOKENS:-}
 
 # Admin
 HICLAW_ADMIN_USER=${HICLAW_ADMIN_USER}

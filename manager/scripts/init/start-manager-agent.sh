@@ -410,7 +410,19 @@ case "${MODEL_NAME}" in
     glm-5|MiniMax-M2.5)
         export MODEL_CONTEXT_WINDOW=200000 MODEL_MAX_TOKENS=128000 ;;
     *)
-        export MODEL_CONTEXT_WINDOW=150000 MODEL_MAX_TOKENS=128000 ;;
+        # For custom/unknown models, check if user provided values via env vars
+        # Otherwise use defaults (150k context, 128k max tokens)
+        if [ -n "${HICLAW_MODEL_CONTEXT_WINDOW:-}" ]; then
+            export MODEL_CONTEXT_WINDOW="${HICLAW_MODEL_CONTEXT_WINDOW}"
+        else
+            export MODEL_CONTEXT_WINDOW=150000
+        fi
+        if [ -n "${HICLAW_MODEL_MAX_TOKENS:-}" ]; then
+            export MODEL_MAX_TOKENS="${HICLAW_MODEL_MAX_TOKENS}"
+        else
+            export MODEL_MAX_TOKENS=128000
+        fi
+        ;;
 esac
 export MODEL_REASONING=true
 
@@ -430,6 +442,14 @@ case "${MODEL_NAME}" in
         export MODEL_INPUT='["text"]' ;;
 esac
 
+# Log if custom context window / max tokens were provided
+if [ -n "${HICLAW_MODEL_CONTEXT_WINDOW:-}" ]; then
+    log "Using custom context window: ${MODEL_CONTEXT_WINDOW}"
+fi
+if [ -n "${HICLAW_MODEL_MAX_TOKENS:-}" ]; then
+    log "Using custom max tokens: ${MODEL_MAX_TOKENS}"
+fi
+
 log "Model: ${MODEL_NAME} (context=${MODEL_CONTEXT_WINDOW}, maxTokens=${MODEL_MAX_TOKENS}, reasoning=${MODEL_REASONING}, input=${MODEL_INPUT})"
 
 if [ -f /root/manager-workspace/openclaw.json ]; then
@@ -437,17 +457,55 @@ if [ -f /root/manager-workspace/openclaw.json ]; then
     # Merge known models into existing config (add missing, preserve user-added)
     # Use known-models.json (valid JSON) instead of template (contains ${VAR} placeholders)
     KNOWN_MODELS=$(cat /opt/hiclaw/configs/known-models.json 2>/dev/null || echo '[]')
-    jq --arg token "${MANAGER_TOKEN}" \
-       --arg key "${HICLAW_MANAGER_GATEWAY_KEY}" \
-       --arg model "${MODEL_NAME}" \
-       --argjson e2ee "${MATRIX_E2EE_ENABLED}" \
-       --argjson known_models "${KNOWN_MODELS}" \
-       '
+
+    # Check if current model is in known models
+    MODEL_IN_KNOWN=$(echo "${KNOWN_MODELS}" | jq -r --arg model "${MODEL_NAME}" 'map(.id) | index($model) // false')
+
+    # Build jq args based on whether model is known or custom
+    JQ_ARGS=(
+        --arg token "${MANAGER_TOKEN}"
+        --arg key "${HICLAW_MANAGER_GATEWAY_KEY}"
+        --arg model "${MODEL_NAME}"
+        --argjson e2ee "${MATRIX_E2EE_ENABLED}"
+        --argjson known_models "${KNOWN_MODELS}"
+    )
+
+    # For custom models, add context window and max tokens
+    if [ "${MODEL_IN_KNOWN}" = "false" ]; then
+        JQ_ARGS+=(
+            --argjson context_window "${MODEL_CONTEXT_WINDOW}"
+            --argjson max_tokens "${MODEL_MAX_TOKENS}"
+            --argjson reasoning "${MODEL_REASONING}"
+            --argjson input "${MODEL_INPUT}"
+        )
+    fi
+
+    jq "${JQ_ARGS[@]}" '
         # Merge known models: add any model id not already present
         .models.providers["hiclaw-gateway"].models as $existing
         | ($existing | map(.id)) as $existing_ids
         | ($known_models | map(select(.id as $id | $existing_ids | index($id) | not))) as $new
         | .models.providers["hiclaw-gateway"].models = ($existing + $new)
+        # For custom models: update or add the current model with correct contextWindow/maxTokens
+        | if ($model | . as $m | $existing_ids | index($m) | not) then
+            # Model not in existing list, check if we need to add it
+            (.models.providers["hiclaw-gateway"].models | map(.id) | index($model)) as $idx
+            | if $idx then
+                # Update existing custom model entry
+                .models.providers["hiclaw-gateway"].models[$idx].contextWindow = $context_window
+                | .models.providers["hiclaw-gateway"].models[$idx].maxTokens = $max_tokens
+              else
+                # Add new custom model entry
+                .models.providers["hiclaw-gateway"].models += [{
+                    "id": $model,
+                    "name": $model,
+                    "reasoning": $reasoning,
+                    "contextWindow": $context_window,
+                    "maxTokens": $max_tokens,
+                    "input": $input
+                }]
+              end
+          else . end
         # Rebuild model aliases from the full models list
         | (.models.providers["hiclaw-gateway"].models | map({ ("hiclaw-gateway/" + .id): { "alias": .id } }) | add // {}) as $aliases
         | .agents.defaults.models = ((.agents.defaults.models // {}) + $aliases)

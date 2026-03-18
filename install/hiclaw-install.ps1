@@ -308,6 +308,15 @@ $script:Messages = @{
     "llm.openai.model_prompt" = @{ zh = "默认模型 ID [gpt-5.4]"; en = "Default Model ID [gpt-5.4]" }
     "llm.openai.base_url_label" = @{ zh = "  Base URL: {0}"; en = "  Base URL: {0}" }
 
+    # --- Context Window / Max Tokens (for custom models like vLLM) ---
+    "llm.openai.context_window_hint" = @{ zh = "上下文窗口配置（对于 vLLM 等自定义模型很重要）"; en = "Context window configuration (important for custom models like vLLM)" }
+    "llm.openai.context_window_prompt" = @{ zh = "上下文窗口大小（留空使用默认 150000）"; en = "Context window size (press Enter for default 150000)" }
+    "llm.openai.context_window_label" = @{ zh = "  上下文窗口: {0}"; en = "  Context window: {0}" }
+    "llm.openai.context_window_default" = @{ zh = "  使用默认上下文窗口: 150000"; en = "  Using default context window: 150000" }
+    "llm.openai.max_tokens_prompt" = @{ zh = "最大输出 tokens（留空使用默认 128000）"; en = "Max output tokens (press Enter for default 128000)" }
+    "llm.openai.max_tokens_label" = @{ zh = "  最大输出 tokens: {0}"; en = "  Max output tokens: {0}" }
+    "llm.openai.max_tokens_default" = @{ zh = "  使用默认最大输出 tokens: 128000"; en = "  Using default max output tokens: 128000" }
+
     # --- Admin Credentials ---
     "admin.title" = @{ zh = "--- 管理员凭据 ---"; en = "--- Admin Credentials ---" }
     "admin.username_prompt" = @{ zh = "管理员用户名"; en = "Admin Username" }
@@ -681,6 +690,8 @@ HICLAW_LLM_PROVIDER=$($Config.LLM_PROVIDER)
 HICLAW_DEFAULT_MODEL=$($Config.DEFAULT_MODEL)
 HICLAW_LLM_API_KEY=$($Config.LLM_API_KEY)
 HICLAW_OPENAI_BASE_URL=$($Config.OPENAI_BASE_URL)
+HICLAW_MODEL_CONTEXT_WINDOW=$($Config.MODEL_CONTEXT_WINDOW)
+HICLAW_MODEL_MAX_TOKENS=$($Config.MODEL_MAX_TOKENS)
 
 # Admin
 HICLAW_ADMIN_USER=$($Config.ADMIN_USER)
@@ -1465,6 +1476,8 @@ function Install-Manager {
         $config.LLM_PROVIDER = if ($env:HICLAW_LLM_PROVIDER) { $env:HICLAW_LLM_PROVIDER } else { "qwen" }
         $config.DEFAULT_MODEL = if ($env:HICLAW_DEFAULT_MODEL) { $env:HICLAW_DEFAULT_MODEL } else { "qwen3.5-plus" }
         $config.OPENAI_BASE_URL = if ($env:HICLAW_OPENAI_BASE_URL) { $env:HICLAW_OPENAI_BASE_URL } else { "" }
+        $config.MODEL_CONTEXT_WINDOW = if ($env:HICLAW_MODEL_CONTEXT_WINDOW) { [int]$env:HICLAW_MODEL_CONTEXT_WINDOW } else { 150000 }
+        $config.MODEL_MAX_TOKENS = if ($env:HICLAW_MODEL_MAX_TOKENS) { [int]$env:HICLAW_MODEL_MAX_TOKENS } else { 128000 }
 
         Write-Log (Get-Msg "llm.provider.label" -f $config.LLM_PROVIDER)
         Write-Log (Get-Msg "llm.model.label" -f $config.DEFAULT_MODEL)
@@ -1617,6 +1630,29 @@ function Install-Manager {
 
                 Write-Log (Get-Msg "llm.openai.base_url_label" -f $config.OPENAI_BASE_URL)
                 Write-Log (Get-Msg "llm.model.label" -f $config.DEFAULT_MODEL)
+
+                # Ask for context window and max tokens for custom models
+                Write-Host ""
+                Write-Host (Get-Msg "llm.openai.context_window_hint")
+
+                $contextWindowInput = Read-Host (Get-Msg "llm.openai.context_window_prompt")
+                if ($contextWindowInput) {
+                    $config.MODEL_CONTEXT_WINDOW = [int]$contextWindowInput
+                    Write-Log (Get-Msg "llm.openai.context_window_label" -f $config.MODEL_CONTEXT_WINDOW)
+                } else {
+                    Write-Log (Get-Msg "llm.openai.context_window_default")
+                    $config.MODEL_CONTEXT_WINDOW = 150000
+                }
+
+                $maxTokensInput = Read-Host (Get-Msg "llm.openai.max_tokens_prompt")
+                if ($maxTokensInput) {
+                    $config.MODEL_MAX_TOKENS = [int]$maxTokensInput
+                    Write-Log (Get-Msg "llm.openai.max_tokens_label" -f $config.MODEL_MAX_TOKENS)
+                } else {
+                    Write-Log (Get-Msg "llm.openai.max_tokens_default")
+                    $config.MODEL_MAX_TOKENS = 128000
+                }
+
                 Write-Log ""
                 $config.LLM_API_KEY = Read-Prompt -VarName "HICLAW_LLM_API_KEY" -PromptText (Get-Msg "llm.apikey_prompt") -Secret
                 Test-LlmConnectivity -BaseUrl $config.OPENAI_BASE_URL -ApiKey $config.LLM_API_KEY -Model $config.DEFAULT_MODEL
