@@ -1972,10 +1972,16 @@ function Install-Manager {
     $wsDockerPath = ConvertTo-DockerPath -Path $config.WORKSPACE_DIR
     $dockerArgs += @("-v", "${wsDockerPath}:/root/manager-workspace")
 
-    # Host share mount
-    $shareDockerPath = ConvertTo-DockerPath -Path $config.HOST_SHARE_DIR
-    $dockerArgs += @("-v", "${shareDockerPath}:/host-share")
-    Write-Log (Get-Msg "host_share.sharing" -f $config.HOST_SHARE_DIR)
+    # Host share mount - only mount if directory exists
+    if ($config.HOST_SHARE_DIR -and (Test-Path -Path $config.HOST_SHARE_DIR -PathType Container)) {
+        $shareDockerPath = ConvertTo-DockerPath -Path $config.HOST_SHARE_DIR
+        $dockerArgs += @("-v", "${shareDockerPath}:/host-share")
+        Write-Log (Get-Msg "host_share.sharing" -f $config.HOST_SHARE_DIR)
+    }
+    elseif ($config.HOST_SHARE_DIR) {
+        Write-Log (Get-Msg "host_share.not_exist" -f $config.HOST_SHARE_DIR)
+        # Do not create mount if directory doesn't exist - skip silently
+    }
 
     # YOLO mode
     if ($env:HICLAW_YOLO -eq "1") {

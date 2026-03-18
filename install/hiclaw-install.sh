@@ -2002,12 +2002,16 @@ EOF
     TZ_ARGS="-e TZ=${HICLAW_TIMEZONE}"
 
     # Host directory mount
-    if [ -d "${HICLAW_HOST_SHARE_DIR}" ]; then
-        HOST_SHARE_MOUNT_ARGS="-v ${HICLAW_HOST_SHARE_DIR}:/host-share"
-        log "$(msg host_share.sharing "${HICLAW_HOST_SHARE_DIR}")"
-    else
-        log "$(msg host_share.not_exist "${HICLAW_HOST_SHARE_DIR}")"
-        HOST_SHARE_MOUNT_ARGS="-v ${HICLAW_HOST_SHARE_DIR}:/host-share"
+    # Only mount if HICLAW_HOST_SHARE_DIR is set and the directory exists
+    HOST_SHARE_MOUNT_ARGS=""
+    if [ -n "${HICLAW_HOST_SHARE_DIR}" ]; then
+        if [ -d "${HICLAW_HOST_SHARE_DIR}" ]; then
+            HOST_SHARE_MOUNT_ARGS="-v ${HICLAW_HOST_SHARE_DIR}:/host-share"
+            log "$(msg host_share.sharing "${HICLAW_HOST_SHARE_DIR}")"
+        else
+            log "$(msg host_share.not_exist "${HICLAW_HOST_SHARE_DIR}")"
+            # Do not create mount if directory doesn't exist - skip silently
+        fi
     fi
 
     # YOLO mode: pass through if set in environment (enables autonomous decisions)
