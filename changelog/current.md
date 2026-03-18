@@ -4,6 +4,7 @@ Record image-affecting changes to `manager/`, `worker/`, `openclaw-base/` here b
 
 ---
 
+- fix(manager): use max_completion_tokens for GPT-5 models in LLM connectivity tests (fixes #334)
 - fix(manager): normalize worker name to lowercase in create-worker.sh to match Tuwunel's username storage behavior, fixing invite failures when worker names contain uppercase letters
 - feat(cloud): add Alibaba Cloud native deployment support with unified cloud/local abstraction layer
 - feat(cloud): add CoPaw worker support for cloud deployment

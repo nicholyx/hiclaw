@@ -15,6 +15,15 @@
 set -e
 source /opt/hiclaw/scripts/lib/base.sh
 
+_get_max_tokens_param() {
+    local model="$1"
+    if [[ "${model}" =~ ^gpt-5(\.|-|[0-9]|$) ]]; then
+        echo "max_completion_tokens"
+    else
+        echo "max_tokens"
+    fi
+}
+
 MODEL_NAME="${1:-}"
 if [ -z "${MODEL_NAME}" ]; then
     echo "Usage: $0 <MODEL_ID> [--context-window <SIZE>] [--no-reasoning]"
@@ -102,11 +111,12 @@ if [ -z "${GATEWAY_KEY}" ] && [ -f "/data/hiclaw-secrets.env" ]; then
 fi
 
 log "Testing model reachability: ${GATEWAY_URL} (model=${MODEL_NAME})..."
+MAX_TOKENS_PARAM=$(_get_max_tokens_param "${MODEL_NAME}")
 HTTP_CODE=$(curl -s -o /tmp/model-test-resp.json -w '%{http_code}' \
     -X POST "${GATEWAY_URL}" \
     -H "Authorization: Bearer ${GATEWAY_KEY}" \
     -H "Content-Type: application/json" \
-    -d "{\"model\":\"${MODEL_NAME}\",\"messages\":[{\"role\":\"user\",\"content\":\"hi\"}],\"max_tokens\":1}" \
+    -d "{\"model\":\"${MODEL_NAME}\",\"messages\":[{\"role\":\"user\",\"content\":\"hi\"}],\"${MAX_TOKENS_PARAM}\":1}" \
     --connect-timeout 10 --max-time 30 2>/dev/null) || HTTP_CODE="000"
 
 if [ "${HTTP_CODE}" != "200" ]; then
