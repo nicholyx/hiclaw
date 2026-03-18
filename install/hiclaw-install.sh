@@ -520,6 +520,10 @@ msg() {
         "install.image.worker_exists.en") text="Worker image already exists locally: %s" ;;
         "install.image.pulling_worker.zh") text="正在拉取 Worker 镜像: %s" ;;
         "install.image.pulling_worker.en") text="Pulling Worker image: %s" ;;
+        "install.image.pruning.zh") text="正在清理悬空镜像..." ;;
+        "install.image.pruning.en") text="Cleaning up dangling images..." ;;
+        "install.image.pruned.zh") text="悬空镜像已清理" ;;
+        "install.image.pruned.en") text="Dangling images cleaned up" ;;
         # --- Starting container ---
         "install.starting_manager.zh") text="正在启动 Manager 容器..." ;;
         "install.starting_manager.en") text="Starting Manager container..." ;;
@@ -2080,6 +2084,14 @@ EOF
             ${DOCKER_CMD} rm "${w}" 2>/dev/null || true
             log "$(msg install.existing.removed "${w}")"
         done
+    fi
+
+    # Clean up dangling images after container removal (only during upgrades)
+    # This prevents leftover images from accumulating during upgrades
+    if [ "${HICLAW_UPGRADE:-0}" = "1" ]; then
+        log "$(msg install.image.pruning)"
+        ${DOCKER_CMD} image prune -f 2>/dev/null || true
+        log "$(msg install.image.pruned)"
     fi
 
     # Run Manager container

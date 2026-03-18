@@ -57,6 +57,21 @@ else
 fi
 
 # ============================================================
+# Test: Verify cleanup only runs during upgrades
+# ============================================================
+
+log_section "Test 2b: Verify cleanup only runs during upgrades"
+
+# Check that prune is wrapped in HICLAW_UPGRADE condition
+if grep -A3 "HICLAW_UPGRADE" "${INSTALL_SCRIPT}" | grep -q "image prune"; then
+    log_pass "Image prune is conditional on upgrade mode"
+elif grep -B3 "image prune" "${INSTALL_SCRIPT}" | grep -q "HICLAW_UPGRADE"; then
+    log_pass "Image prune is conditional on upgrade mode"
+else
+    log_fail "Image prune is NOT conditional on upgrade mode (will run on every install)"
+fi
+
+# ============================================================
 # Test: Verify prune uses -f flag (non-interactive)
 # ============================================================
 
