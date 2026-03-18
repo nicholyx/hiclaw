@@ -32,6 +32,7 @@ If the Manager doesn't have socket access, it will reply with a `docker run` com
 
 ```bash
 docker run -d --name hiclaw-worker-alice \
+  --restart=unless-stopped \
   -e HICLAW_WORKER_NAME=alice \
   -e HICLAW_FS_ENDPOINT=http://<MANAGER_HOST>:9000 \
   -e HICLAW_FS_ACCESS_KEY=<ACCESS_KEY> \
@@ -40,6 +41,72 @@ docker run -d --name hiclaw-worker-alice \
 ```
 
 The Manager will provide all the specific values in its reply.
+
+> **Tip**: The `--restart=unless-stopped` flag ensures the Worker container automatically restarts when:
+> - The Docker daemon restarts (e.g., after system reboot)
+> - The container crashes unexpectedly
+> This makes remote Workers behave similarly to locally-created Workers.
+
+### Auto-restart Options for Remote Workers
+
+For remote Workers deployed via Method 2, you have several options to ensure automatic startup:
+
+#### Option 1: Docker Restart Policy (Recommended)
+
+Add `--restart=unless-stopped` to your `docker run` command:
+
+```bash
+docker run -d --name hiclaw-worker-alice \
+  --restart=unless-stopped \
+  ...
+```
+
+**Restart policy options:**
+| Policy | Behavior |
+|--------|----------|
+| `--restart=unless-stopped` | Restarts on crash and system reboot, unless manually stopped |
+| `--restart=always` | Always restarts, even if manually stopped (restarts on daemon start) |
+| `--restart=on-failure[:max-retries]` | Only restarts on non-zero exit code |
+
+#### Option 2: Apply Restart Policy to Existing Container
+
+If you already have a running Worker without a restart policy:
+
+```bash
+# Update the restart policy for an existing container
+docker update --restart=unless-stopped hiclaw-worker-alice
+```
+
+#### Option 3: Systemd Service (Linux)
+
+For production deployments requiring more control, create a systemd service:
+
+```bash
+# Create service file
+sudo cat > /etc/systemd/system/hiclaw-worker-alice.service << 'EOF'
+[Unit]
+Description=HiClaw Worker Agent (alice)
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/docker start -a hiclaw-worker-alice
+ExecStop=/usr/bin/docker stop hiclaw-worker-alice
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+# Enable and start
+sudo systemctl daemon-reload
+sudo systemctl enable hiclaw-worker-alice
+sudo systemctl start hiclaw-worker-alice
+```
+
+> **Note**: When using systemd, remove `--restart` from the `docker run` command to avoid conflicts.
 
 ## Troubleshooting
 
