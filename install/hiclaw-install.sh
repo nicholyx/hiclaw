@@ -454,8 +454,8 @@ msg() {
         "host_share.prompt.en") text="Host directory to share with agents (default: %s)" ;;
         "host_share.sharing.zh") text="共享主机目录: %s -> 容器内 /host-share" ;;
         "host_share.sharing.en") text="Sharing host directory: %s -> /host-share in container" ;;
-        "host_share.not_exist.zh") text="警告: 主机目录 %s 不存在，跳过验证继续使用" ;;
-        "host_share.not_exist.en") text="WARNING: Host directory %s does not exist, using without validation" ;;
+        "host_share.not_exist.zh") text="警告: 主机目录 %s 不存在，跳过挂载" ;;
+        "host_share.not_exist.en") text="WARNING: Host directory %s does not exist, mount skipped" ;;
         # --- Default worker runtime ---
         "worker_runtime.title.zh") text="--- 默认 Worker 运行时 ---" ;;
         "worker_runtime.title.en") text="--- Default Worker Runtime ---" ;;

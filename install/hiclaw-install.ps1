@@ -368,7 +368,7 @@ $script:Messages = @{
     # --- Host directory sharing ---
     "host_share.prompt" = @{ zh = "与 Agent 共享的主机目录（默认: {0}）"; en = "Host directory to share with agents (default: {0})" }
     "host_share.sharing" = @{ zh = "共享主机目录: {0} -> 容器内 /host-share"; en = "Sharing host directory: {0} -> /host-share in container" }
-    "host_share.not_exist" = @{ zh = "警告: 主机目录 {0} 不存在，跳过验证继续使用"; en = "WARNING: Host directory {0} does not exist, using without validation" }
+    "host_share.not_exist" = @{ zh = "警告: 主机目录 {0} 不存在，跳过挂载"; en = "WARNING: Host directory {0} does not exist, mount skipped" }
 
     # --- Default worker runtime ---
     "worker_runtime.title" = @{ zh = "--- 默认 Worker 运行时 ---"; en = "--- Default Worker Runtime ---" }
