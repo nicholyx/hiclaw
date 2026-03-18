@@ -434,11 +434,16 @@ log "Model: ${MODEL_NAME} (context=${MODEL_CONTEXT_WINDOW}, maxTokens=${MODEL_MA
 
 if [ -f /root/manager-workspace/openclaw.json ]; then
     log "Manager openclaw.json already exists, updating dynamic fields only (preserving user customizations)..."
-    # Merge known models into existing config (add missing, preserve user-added)
+    # Resolve LLM API key: prefer HICLAW_LLM_API_KEY (real LLM credentials) over HICLAW_MANAGER_GATEWAY_KEY
+    # The gateway key is for Higress consumer auth, but the LLM provider needs the real API key.
+    LLM_API_KEY="${HICLAW_LLM_API_KEY:-${HICLAW_MANAGER_GATEWAY_KEY}}"
+
+    # Update openclaw.json with dynamic fields (preserving user customizations)
     # Use known-models.json (valid JSON) instead of template (contains ${VAR} placeholders)
     KNOWN_MODELS=$(cat /opt/hiclaw/configs/known-models.json 2>/dev/null || echo '[]')
     jq --arg token "${MANAGER_TOKEN}" \
-       --arg key "${HICLAW_MANAGER_GATEWAY_KEY}" \
+       --arg llm_key "${LLM_API_KEY}" \
+       --arg gateway_key "${HICLAW_MANAGER_GATEWAY_KEY}" \
        --arg model "${MODEL_NAME}" \
        --argjson e2ee "${MATRIX_E2EE_ENABLED}" \
        --argjson known_models "${KNOWN_MODELS}" \
@@ -451,7 +456,9 @@ if [ -f /root/manager-workspace/openclaw.json ]; then
         # Rebuild model aliases from the full models list
         | (.models.providers["hiclaw-gateway"].models | map({ ("hiclaw-gateway/" + .id): { "alias": .id } }) | add // {}) as $aliases
         | .agents.defaults.models = ((.agents.defaults.models // {}) + $aliases)
-        | .channels.matrix.accessToken = $token | .hooks.token = $key | .models.providers["hiclaw-gateway"].apiKey = $key
+        | .channels.matrix.accessToken = $token
+        | .hooks.token = $gateway_key
+        | .models.providers["hiclaw-gateway"].apiKey = $llm_key
         | .agents.defaults.model.primary = ("hiclaw-gateway/" + $model)
         | .commands.restart = true
         | .gateway.controlUi.dangerouslyDisableDeviceAuth = true
@@ -468,6 +475,8 @@ if [ -f /root/manager-workspace/openclaw.json ]; then
     fi
 else
     log "Manager openclaw.json not found, generating from template..."
+    # Ensure HICLAW_LLM_API_KEY has a fallback for template substitution
+    export HICLAW_LLM_API_KEY="${HICLAW_LLM_API_KEY:-${HICLAW_MANAGER_GATEWAY_KEY}}"
     envsubst < /opt/hiclaw/configs/manager-openclaw.json.tmpl > /root/manager-workspace/openclaw.json
     _written_token=$(jq -r '.channels.matrix.accessToken' /root/manager-workspace/openclaw.json 2>/dev/null)
     log "Matrix token written from template (prefix: ${_written_token:0:10}...)"
@@ -476,13 +485,16 @@ fi
 # Cloud mode: overlay cloud-specific settings onto generated config
 if [ "${HICLAW_RUNTIME}" = "aliyun" ]; then
     log "Applying cloud overlay to openclaw.json..."
+    # In cloud mode, use HICLAW_LLM_API_KEY for LLM provider, fallback to gateway key
+    _cloud_llm_key="${HICLAW_LLM_API_KEY:-${HICLAW_MANAGER_GATEWAY_KEY}}"
     jq --arg homeserver "${HICLAW_MATRIX_SERVER}" \
        --arg gateway "${HICLAW_AI_GATEWAY_URL}/v1" \
-       --arg key "${HICLAW_MANAGER_GATEWAY_KEY}" \
+       --arg llm_key "${_cloud_llm_key}" \
+       --arg gateway_key "${HICLAW_MANAGER_GATEWAY_KEY}" \
        '.channels.matrix.homeserver = $homeserver
         | .models.providers["hiclaw-gateway"].baseUrl = $gateway
-        | .models.providers["hiclaw-gateway"].apiKey = $key
-        | .hooks.token = $key
+        | .models.providers["hiclaw-gateway"].apiKey = $llm_key
+        | .hooks.token = $gateway_key
         | .commands.restart = false' \
        /root/manager-workspace/openclaw.json > /tmp/openclaw-cloud.json && \
         mv /tmp/openclaw-cloud.json /root/manager-workspace/openclaw.json

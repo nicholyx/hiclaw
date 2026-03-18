@@ -40,7 +40,7 @@
     "providers": {
       "hiclaw-gateway": {
         "baseUrl": "http://${HICLAW_AI_GATEWAY_DOMAIN}:8080/v1",
-        "apiKey": "${MANAGER_GATEWAY_KEY}",
+        "apiKey": "${HICLAW_LLM_API_KEY}",
         "api": "openai-completions",
         "models": [
           { "id": "gpt-5.4",           "name": "gpt-5.4",           "reasoning": true,  "contextWindow": 1050000, "maxTokens": 128000, "input": ["text", "image"] },
