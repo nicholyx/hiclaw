@@ -5,7 +5,7 @@
 - **Issue 编号**: #321
 - **Issue 类型**: enhancement (文档改进)
 - **仓库**: higress-group/hiclaw
-- **状态**: In Progress
+- **状态**: ✅ Completed
 
 ## 问题描述
 
@@ -24,16 +24,24 @@
 ## 实现计划
 
 - [x] 理解需求 - 用户想知道如何让远程 Worker 自动启动
-- [ ] 编写改进 - 在 worker-guide.md 中添加自动启动说明
-- [ ] 验证 - 确保文档格式正确，信息完整
-- [ ] 代码审查
-- [ ] 提交代码
+- [x] 编写改进 - 在 worker-guide.md 中添加自动启动说明
+- [x] 验证 - 确保文档格式正确，信息完整
+- [x] 代码审查 - ✅ 通过
+- [x] 提交代码
+
+## 使用的 Skills
+
+| 步骤 | Skill | 结果 |
+|------|-------|------|
+| 步骤 4 | superpowers:using-git-worktrees | ✅ 成功创建 worktree |
+| 步骤 6 | superpowers:brainstorming | ✅ 快速完成需求理解 |
+| 步骤 10 | superpowers:requesting-code-review | ✅ 审查通过，修复后再次通过 |
 
 ## 解决方案
 
-在 `docs/worker-guide.md` 中添加以下内容：
+在 `docs/worker-guide.md` 中进行了以下改进：
 
-### 1. 在 Method 2 的 docker run 命令中添加 `--restart` 参数说明
+### 1. 在 Method 2 的 docker run 命令中添加 `--restart=unless-stopped` 参数
 
 ```bash
 docker run -d --name hiclaw-worker-alice \
@@ -42,13 +50,45 @@ docker run -d --name hiclaw-worker-alice \
   ...
 ```
 
-### 2. 添加一个新的章节 "Auto-start for Remote Workers"
+### 2. 添加了提示框说明 restart 参数的作用
 
-说明几种自动启动方式：
-- Docker restart policy (`--restart=always` 或 `--restart=unless-stopped`)
-- systemd service (适用于 Linux)
-- Docker Compose (可选)
+> **Tip**: The `--restart=unless-stopped` flag ensures the Worker container automatically restarts when:
+> - The Docker daemon restarts (e.g., after system reboot)
+> - The container crashes unexpectedly
+
+### 3. 添加了 "Auto-restart Options for Remote Workers" 章节
+
+包含三种自动启动方式：
+
+#### Option 1: Docker Restart Policy (Recommended)
+- 提供了 restart policy 选项表格
+- 说明了 `unless-stopped`、`always`、`on-failure` 的区别
+
+#### Option 2: Apply Restart Policy to Existing Container
+- 使用 `docker update --restart=unless-stopped` 命令
+- 添加了说明：对运行和停止的容器都有效
+
+#### Option 3: Systemd Service (Linux)
+- 提供了完整的 systemd service 配置示例
+- 说明了与 docker restart policy 的冲突避免
+
+## 修改的文件
+
+- `docs/worker-guide.md` - 添加了自动启动说明
+
+## Git 提交记录
+
+```
+a572ad7 docs(worker): improve auto-restart section structure
+4b914e6 docs(worker): add auto-restart options for remote workers
+817179c docs: add task for issue #321 - worker auto-start docs
+```
 
 ## 进度记录
 
-- 2026-03-18: 开始处理，创建 task 文档
+- 2026-03-18 18:05: 开始处理，创建 task 文档
+- 2026-03-18 18:10: 完成文档修改
+- 2026-03-18 18:15: 第一次代码审查，发现 3 个 Important 问题
+- 2026-03-18 18:20: 修复问题并重新提交
+- 2026-03-18 18:22: 第二次代码审查通过
+- 2026-03-18 18:25: 任务完成
