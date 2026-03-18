@@ -47,37 +47,32 @@ The Manager will provide all the specific values in its reply.
 > - The container crashes unexpectedly
 > This makes remote Workers behave similarly to locally-created Workers.
 
-### Auto-restart Options for Remote Workers
+#### Auto-restart Options for Remote Workers
 
 For remote Workers deployed via Method 2, you have several options to ensure automatic startup:
 
-#### Option 1: Docker Restart Policy (Recommended)
+##### Docker Restart Policy (Recommended)
 
-Add `--restart=unless-stopped` to your `docker run` command:
+The `--restart=unless-stopped` flag has already been included in the command above. Other restart policy options:
 
-```bash
-docker run -d --name hiclaw-worker-alice \
-  --restart=unless-stopped \
-  ...
-```
-
-**Restart policy options:**
 | Policy | Behavior |
 |--------|----------|
 | `--restart=unless-stopped` | Restarts on crash and system reboot, unless manually stopped |
 | `--restart=always` | Always restarts, even if manually stopped (restarts on daemon start) |
 | `--restart=on-failure[:max-retries]` | Only restarts on non-zero exit code |
 
-#### Option 2: Apply Restart Policy to Existing Container
+##### Apply Restart Policy to Existing Container
 
-If you already have a running Worker without a restart policy:
+If you already have a Worker without a restart policy:
 
 ```bash
 # Update the restart policy for an existing container
 docker update --restart=unless-stopped hiclaw-worker-alice
 ```
 
-#### Option 3: Systemd Service (Linux)
+> **Note**: This works for both running and stopped containers. The new policy takes effect on the next container start.
+
+##### Systemd Service (Linux)
 
 For production deployments requiring more control, create a systemd service:
 
