@@ -295,6 +295,58 @@ action_stop() {
     fi
 }
 
+# Delete a worker container completely (stops and removes)
+# Use this when a project is completed and the worker is no longer needed.
+# This is different from stop - the container is completely removed and will
+# need to be recreated if the worker is needed again.
+action_delete() {
+    local worker="$1"
+    _init_lifecycle_file
+
+    # Check if worker exists in registry
+    local exists
+    exists=$(jq -r --arg w "$worker" '.workers | has($w)' "$REGISTRY_FILE" 2>/dev/null)
+    if [ "$exists" != "true" ]; then
+        _log "ERROR: Worker $worker not found in registry"
+        echo "{\"worker\":\"$worker\",\"status\":\"failed\",\"error\":\"not_found_in_registry\"}"
+        return 1
+    fi
+
+    # Skip remote workers — they are not Manager-managed containers
+    local deployment
+    deployment=$(jq -r --arg w "$worker" '.workers[$w].deployment // "local"' "$REGISTRY_FILE" 2>/dev/null)
+    if [ "$deployment" = "remote" ]; then
+        _log "Worker $worker is remote — cannot delete via container API"
+        _log "The admin should remove this worker on the target machine manually"
+        echo "{\"worker\":\"$worker\",\"status\":\"remote\",\"error\":\"cannot_delete_remote\"}"
+        return 1
+    fi
+
+    local backend
+    backend=$(_detect_worker_backend)
+    if [ "$backend" = "none" ]; then
+        _log "ERROR: No worker backend available"
+        echo "{\"worker\":\"$worker\",\"status\":\"failed\",\"error\":\"no_backend_available\"}"
+        return 1
+    fi
+
+    _log "Deleting worker $worker container (backend=$backend)"
+    if worker_backend_delete "$worker"; then
+        # Remove the worker entry from lifecycle file
+        local tmp
+        tmp=$(mktemp)
+        jq --arg w "$worker" --arg ts "$(_ts)" \
+            'del(.workers[$w]) | .updated_at = $ts' \
+            "$LIFECYCLE_FILE" > "$tmp" && mv "$tmp" "$LIFECYCLE_FILE"
+        _log "Worker $worker container deleted and removed from lifecycle file"
+        echo "{\"worker\":\"$worker\",\"status\":\"deleted\"}"
+    else
+        _log "ERROR: Failed to delete worker $worker container"
+        echo "{\"worker\":\"$worker\",\"status\":\"failed\",\"error\":\"delete_failed\"}"
+        return 1
+    fi
+}
+
 # Start (wake up) a stopped worker, or recreate if it no longer exists
 # (e.g. after Manager upgrade where old containers were removed).
 action_start() {
@@ -443,7 +495,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 if [ -z "$ACTION" ]; then
-    echo "Usage: $0 --action <sync-status|check-idle|stop|start> [--worker <name>]" >&2
+    echo "Usage: $0 --action <sync-status|check-idle|stop|start|delete|ensure-ready> [--worker <name>]" >&2
     exit 1
 fi
 
@@ -475,8 +527,15 @@ case "$ACTION" in
         fi
         action_ensure_ready "$WORKER"
         ;;
+    delete)
+        if [ -z "$WORKER" ]; then
+            echo "ERROR: --worker required for action 'delete'" >&2
+            exit 1
+        fi
+        action_delete "$WORKER"
+        ;;
     *)
-        echo "ERROR: Unknown action '$ACTION'. Use: sync-status, check-idle, stop, start, ensure-ready" >&2
+        echo "ERROR: Unknown action '$ACTION'. Use: sync-status, check-idle, stop, start, ensure-ready, delete" >&2
         exit 1
         ;;
 esac

@@ -410,6 +410,47 @@ This script:
 
 2. Re-create: write a new SOUL.md and run `create-worker.sh` again (the script handles re-registration gracefully — it removes the old container first, then creates a fresh one with updated config)
 
+## Delete a Worker
+
+When a Worker is no longer needed (e.g., after a project completes), you can delete the Worker container and remove it from the registry:
+
+### Delete the Worker container
+
+```bash
+bash /opt/hiclaw/agent/skills/worker-management/scripts/lifecycle-worker.sh \
+  --action delete --worker <WORKER_NAME>
+```
+
+This action:
+- Stops the Worker container (if running)
+- Removes the container completely
+- Removes the Worker entry from `worker-lifecycle.json`
+
+### Remove from workers-registry.json
+
+After deleting the container, also remove the Worker from the registry:
+
+```bash
+jq --arg w "<WORKER_NAME>" 'del(.workers[$w])' ~/workers-registry.json > /tmp/reg.json && mv /tmp/reg.json ~/workers-registry.json
+```
+
+### Remove Worker config directory
+
+```bash
+rm -rf /root/hiclaw-fs/agents/<WORKER_NAME>/
+```
+
+### When to delete vs. stop
+
+| Situation | Action |
+|-----------|--------|
+| Project completed, Worker no longer needed | `delete` (removes container completely) |
+| Worker idle but may be reused soon | `stop` (keeps container, can be restarted) |
+| Worker needs fresh start | `reset` (delete + recreate with new config) |
+| Remote Worker no longer needed | Admin removes manually on target machine |
+
+**Important:** Remote Workers (`deployment: "remote"`) cannot be deleted via the lifecycle script — the admin must remove them manually on the target machine.
+
 ## Manage Worker Skills
 
 Manager centrally manages all Worker skills. The canonical skill definitions live in `~/worker-skills/`. Worker skill assignments are tracked in `~/workers-registry.json`.

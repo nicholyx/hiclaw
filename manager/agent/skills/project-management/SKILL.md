@@ -502,6 +502,31 @@ Project plan: /root/hiclaw-fs/shared/projects/{project-id}/plan.md
 
 5. Update `memory/YYYY-MM-DD.md` with project outcome
 
+6. **Cleanup project workers** — Delete worker containers that were created specifically for this project and are no longer needed:
+
+   ```bash
+   # For each worker that was created for this project and has no other tasks:
+   bash /opt/hiclaw/agent/skills/worker-management/scripts/lifecycle-worker.sh \
+     --action delete --worker <worker_name>
+   ```
+
+   **When to delete workers:**
+   - Worker was created specifically for this project (not a general-purpose worker)
+   - Worker has no other active tasks in `state.json`
+   - Worker is not listed in any other active project's plan.md
+
+   **When to keep workers:**
+   - Worker is a general-purpose worker used across multiple projects
+   - Worker has other active tasks assigned
+   - Worker is expected to be reused soon
+
+   After deleting, also remove the worker from `workers-registry.json`:
+   ```bash
+   jq --arg w "<worker_name>" 'del(.workers[$w])' ~/workers-registry.json > /tmp/reg.json && mv /tmp/reg.json ~/workers-registry.json
+   ```
+
+   **Note:** This cleanup prevents the issue where completed project workers remain running and get restarted by heartbeat checks.
+
 ---
 
 ## Step 4: Handle Blocked Tasks
