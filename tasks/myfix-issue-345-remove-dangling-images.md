@@ -19,12 +19,24 @@
 
 ## 实现计划
 
-- [ ] 理解需求 - brainstorming
-- [ ] 编写测试 - test-driven-development
-- [ ] 实现修复 - subagent-driven-development
-- [ ] 验证通过 - verification-before-completion
-- [ ] 代码审查 - requesting-code-review
+- [x] 理解需求 - brainstorming (已完成)
+- [x] 编写测试 - test-driven-development (已完成)
+- [x] 实现修复 - subagent-driven-development (已完成)
+- [x] 验证通过 - verification-before-completion (已完成)
+- [x] 代码审查 - requesting-code-review (已完成，修复了 Important 问题)
 
 ## 进度记录
 
 - 2026-03-18: 开始处理
+- 2026-03-18: 使用 brainstorming skill 分析问题
+  - 问题：升级时拉取新镜像后，旧镜像变成悬空镜像
+  - 解决方案：在容器删除后运行 `docker image prune -f`
+- 2026-03-18: 使用 test-driven-development skill 编写测试
+  - 创建 tests/test-15-dangling-image-cleanup.sh
+  - 测试验证：prune 命令存在、位置正确、使用 -f 标志、仅在升级时执行
+- 2026-03-18: 使用 verification-before-completion skill 验证
+  - 测试全部通过 (6/6)
+- 2026-03-18: 使用 requesting-code-review skill 进行代码审查
+  - 发现 Important 问题：清理逻辑应在升级条件内执行
+  - 已修复：添加 HICLAW_UPGRADE 条件判断
+  - 审查通过
